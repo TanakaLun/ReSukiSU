@@ -20,7 +20,6 @@
 
 #include "allowlist.h"
 #include "setuid_hook.h"
-#include "feature.h"
 #include "klog.h" // IWYU pragma: keep
 #include "manager.h"
 #include "selinux/selinux.h"
@@ -55,29 +54,6 @@ extern void susfs_reorder_mnt_id(void);
 #endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 #endif // #ifdef CONFIG_KSU_SUSFS
 
-static bool ksu_enhanced_security_enabled = false;
-
-static int enhanced_security_feature_get(u64 *value)
-{
-    *value = ksu_enhanced_security_enabled ? 1 : 0;
-    return 0;
-}
-
-static int enhanced_security_feature_set(u64 value)
-{
-    bool enable = value != 0;
-    ksu_enhanced_security_enabled = enable;
-    pr_info("enhanced_security: set to %d\n", enable);
-    return 0;
-}
-
-static const struct ksu_feature_handler enhanced_security_handler = {
-    .feature_id = KSU_FEATURE_ENHANCED_SECURITY,
-    .name = "enhanced_security",
-    .get_handler = enhanced_security_feature_get,
-    .set_handler = enhanced_security_feature_set,
-};
-
 extern void disable_seccomp(struct task_struct *tsk);
 
 #ifndef CONFIG_KSU_SUSFS
@@ -90,31 +66,6 @@ int ksu_handle_setuid(uid_t new_uid, uid_t old_uid, uid_t euid) // (new_euid)
 
     if (old_uid != new_uid)
         pr_info("handle_setresuid from %d to %d\n", old_uid, new_uid);
-
-    // if old process is root, ignore it.
-    if (old_uid != 0 && ksu_enhanced_security_enabled) {
-        // disallow any non-ksu domain escalation from non-root to root!
-        // euid is what we care about here as it controls permission
-        if (unlikely(euid == 0)) {
-            if (!is_ksu_domain()) {
-                pr_warn("find suspicious EoP: %d %s, from %d to %d\n",
-                        current->pid, current->comm, old_uid, new_uid);
-                __force_sig(SIGKILL);
-                return 0;
-            }
-        }
-        // disallow appuid decrease to any other uid if it is not allowed to su
-        if (is_appuid(old_uid)) {
-            if (euid < current_euid().val &&
-                !ksu_is_allow_uid_for_current(old_uid)) {
-                pr_warn("find suspicious EoP: %d %s, from %d to %d\n",
-                        current->pid, current->comm, old_uid, new_uid);
-                __force_sig(SIGKILL);
-                return 0;
-            }
-        }
-        return 0;
-    }
 
     // if on private space, see if its possibly the manager
     if (new_uid > PER_USER_RANGE &&
@@ -177,31 +128,6 @@ int ksu_handle_setuid(uid_t new_uid, uid_t old_uid, uid_t euid)
 {
     // We only interest in process spwaned by zygote
     if (!ksu_is_sid_equal(current_cred(), ksu_zygote_sid)) {
-        return 0;
-    }
-
-    // if old process is root, ignore it.
-    if (old_uid != 0 && ksu_enhanced_security_enabled) {
-        // disallow any non-ksu domain escalation from non-root to root!
-        // euid is what we care about here as it controls permission
-        if (unlikely(euid == 0)) {
-            if (!is_ksu_domain()) {
-                pr_warn("find suspicious EoP: %d %s, from %d to %d\n",
-                        current->pid, current->comm, old_uid, new_uid);
-                __force_sig(SIGKILL);
-                return 0;
-            }
-        }
-        // disallow appuid decrease to any other uid if it is not allowed to su
-        if (is_appuid(old_uid)) {
-            if (euid < current_euid().val &&
-                !ksu_is_allow_uid_for_current(old_uid)) {
-                pr_warn("find suspicious EoP: %d %s, from %d to %d\n",
-                        current->pid, current->comm, old_uid, new_uid);
-                __force_sig(SIGKILL);
-                return 0;
-            }
-        }
         return 0;
     }
 
@@ -293,14 +219,10 @@ int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid)
 void ksu_setuid_hook_init(void)
 {
     ksu_kernel_umount_init();
-    if (ksu_register_feature_handler(&enhanced_security_handler)) {
-        pr_err("Failed to register enhanced security feature handler\n");
-    }
 }
 
 void ksu_setuid_hook_exit(void)
 {
     pr_info("ksu_setuid_hook_exit\n");
     ksu_kernel_umount_exit();
-    ksu_unregister_feature_handler(KSU_FEATURE_ENHANCED_SECURITY);
 }
