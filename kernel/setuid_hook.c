@@ -282,8 +282,12 @@ do_umount:
 
 int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid)
 {
+#ifdef CONFIG_KSU_MANUAL_HOOK_AUTO_SETUID_HOOK
+    return 0; // dummy hook here
+#else
     // we rely on the fact that zygote always call setresuid(3) with same uids
     return ksu_handle_setuid(ruid, current_uid().val, euid);
+#endif
 }
 
 void ksu_setuid_hook_init(void)

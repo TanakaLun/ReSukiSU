@@ -479,16 +479,19 @@ int ksu_handle_initrc(struct file **file_ptr)
 static int ksu_handle_vfs_read(struct file **file_ptr, char __user **buf_ptr,
                                size_t *count_ptr, loff_t **pos)
 {
-#if defined(CONFIG_KSU_SUSFS) ||                                               \
-    (defined(CONFIG_KSU_MANUAL_HOOK) &&                                        \
-     !defined(CONFIG_KSU_MANUAL_HOOK_AUTO_INITRC_HOOK))
+#ifdef CONFIG_KSU_MANUAL_HOOK_AUTO_INITRC_HOOK
+    return 0; // dummy hook here
+#else
+
+#if defined(CONFIG_KSU_SUSFS) || defined(CONFIG_KSU_MANUAL_HOOK)
     if (!ksu_vfs_read_hook) {
         return 0;
     }
+#endif
 
     ksu_handle_initrc(file_ptr);
-#endif
     return 0;
+#endif
 }
 
 int ksu_handle_sys_read(unsigned int fd, char __user **buf_ptr,
