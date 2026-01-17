@@ -5,16 +5,15 @@ import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.DecayAnimationSpec
 import androidx.compose.animation.rememberSplineBasedDecay
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.input.rememberTextFieldState
@@ -150,7 +149,7 @@ private class PinnedScrollBehavior(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
 @Composable
 fun SearchAppBar(
     searchText: String,
@@ -169,10 +168,20 @@ fun SearchAppBar(
     val focusManager = LocalFocusManager.current
     val focusRequester = remember { FocusRequester() }
 
-    BackHandler(searchBarState.currentValue == SearchBarValue.Expanded) {
+    var isExpanded = searchBarState.currentValue == SearchBarValue.Expanded
+    val isKeyboardVisible = WindowInsets.isImeVisible
+
+    LaunchedEffect(isKeyboardVisible) {
+        if (!isKeyboardVisible) {
+            searchBarState.animateToCollapsed()
+        }
+    }
+
+    BackHandler(isExpanded) {
         scope.launch { searchBarState.animateToCollapsed() }
         keyboardController?.hide()
         focusManager.clearFocus()
+        isExpanded = false
     }
 
     val cardAlpha = CardConfig.cardAlpha
@@ -191,17 +200,16 @@ fun SearchAppBar(
         else
             colorScheme.background
 
-    val isExpanded =
-        searchBarState.currentValue == SearchBarValue.Expanded
-
     AppBarWithSearch(
         state = searchBarState,
         inputField = {
             SearchBarDefaults.InputField(
                 modifier = Modifier
+                    .fillMaxWidth()
                     .focusRequester(focusRequester)
+                    .padding(bottom = 5.dp)
                     .clip(SearchBarDefaults.inputFieldShape)
-                    .padding(vertical = 5.dp),
+                    .height(53.dp), // box padding + icon padding + icon size
                 searchBarState = searchBarState,
                 textFieldState = textFieldState,
                 onSearch = { text ->
@@ -211,8 +219,8 @@ fun SearchAppBar(
                     onSearchTextChange(text)
                 },
                 colors = SearchBarDefaults.inputFieldColors(
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = cardAlpha),
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = cardAlpha),
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                 ),
                 placeholder = {
                     Text(
@@ -307,9 +315,6 @@ fun SearchAppBar(
         actions = {
             dropdownContent?.invoke()
         },
-        windowInsets = WindowInsets.safeDrawing.only(
-            WindowInsetsSides.Top + WindowInsetsSides.Horizontal
-        ),
         scrollBehavior = scrollBehavior,
         colors = SearchBarDefaults.appBarWithSearchColors(
             searchBarColors = SearchBarDefaults.colors(
@@ -319,11 +324,9 @@ fun SearchAppBar(
             appBarContainerColor = cardColor.copy(alpha = 0f),
             scrolledAppBarContainerColor = cardColor.copy(alpha = 0f)
         ),
-        modifier = Modifier.statusBarsPadding()
+        modifier = Modifier.fillMaxWidth()
     )
 }
-
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Preview
