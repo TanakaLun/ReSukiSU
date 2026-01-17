@@ -42,15 +42,6 @@ REPO_NAME := ReSukiSU
 REPO_BRANCH := main
 KSU_VERSION_API := 4.1.0
 
-ifeq ($(CONFIG_KSU_SUSFS), y)
-$(info -- $(REPO_NAME): SUSFS Inline Hook is temporary broken)
-$(info -- $(REPO_NAME): if you still want continue, comment out this notice in Kbuild file)
-$(info -- $(REPO_NAME): this problem is because susfs's bug, please track it in susfs's gitlab)
-$(info -- $(REPO_NAME): https://gitlab.com/simonpunk/susfs4ksu/-/commits/gki-android14-6.1-dev?ref_type=heads)
-$(info -- $(REPO_NAME): Process with your own risk!)
-$(error Temporary Stop SUSFS Build)
-endif
-
 GIT_BIN := /usr/bin/env PATH="$$PATH":/usr/bin:/usr/local/bin git
 CURL_BIN := /usr/bin/env PATH="$$PATH":/usr/bin:/usr/local/bin curl
 
