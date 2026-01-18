@@ -59,15 +59,11 @@ jobs:
         
     - name: Setup cargo-ndk
       run: cargo install cargo-ndk --locked
-
-    - name: Setup upx
-      run: sudo apt update && sudo apt install upx -y
         
     - name: Build ksud
       run: |
         cd userspace/ksud/
         cargo ndk b -t ${{ inputs.target }} -r
-        upx --lzma target/*/release/ksud
 
     - name: Upload ksud artifact
       uses: actions/upload-artifact@v6
