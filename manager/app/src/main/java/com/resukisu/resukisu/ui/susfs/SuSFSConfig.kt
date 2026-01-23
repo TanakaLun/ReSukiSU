@@ -4,15 +4,69 @@ import android.annotation.SuppressLint
 import android.content.Context
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.AutoMode
+import androidx.compose.material.icons.filled.Backup
+import androidx.compose.material.icons.filled.CleaningServices
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.filled.RestoreFromTrash
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.PrimaryScrollableTabRow
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Tab
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -26,18 +80,29 @@ import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.annotation.RootGraph
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import com.resukisu.resukisu.R
-import com.resukisu.resukisu.ui.susfs.component.*
-import com.resukisu.resukisu.ui.theme.CardConfig
+import com.resukisu.resukisu.ui.susfs.component.AddAppPathDialog
+import com.resukisu.resukisu.ui.susfs.component.AddKstatStaticallyDialog
+import com.resukisu.resukisu.ui.susfs.component.AddPathDialog
+import com.resukisu.resukisu.ui.susfs.component.ConfirmDialog
+import com.resukisu.resukisu.ui.susfs.component.EnabledFeaturesContent
+import com.resukisu.resukisu.ui.susfs.component.KstatConfigContent
+import com.resukisu.resukisu.ui.susfs.component.PathSettingsContent
+import com.resukisu.resukisu.ui.susfs.component.SusLoopPathsContent
+import com.resukisu.resukisu.ui.susfs.component.SusMapsContent
+import com.resukisu.resukisu.ui.susfs.component.SusMountHidingControlCard
+import com.resukisu.resukisu.ui.susfs.component.SusPathsContent
 import com.resukisu.resukisu.ui.susfs.util.SuSFSManager
+import com.resukisu.resukisu.ui.susfs.util.SuSFSManager.isSusVersion1512
 import com.resukisu.resukisu.ui.susfs.util.SuSFSManager.isSusVersion158
 import com.resukisu.resukisu.ui.susfs.util.SuSFSManager.isSusVersion159
-import com.resukisu.resukisu.ui.susfs.util.SuSFSManager.isSusVersion1512
+import com.resukisu.resukisu.ui.theme.CardConfig
 import com.resukisu.resukisu.ui.util.getSuSFSVersion
 import com.resukisu.resukisu.ui.util.isAbDevice
 import kotlinx.coroutines.launch
 import java.io.File
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Date
+import java.util.Locale
 
 /**
  * 标签页枚举类
@@ -365,7 +430,7 @@ fun SuSFSConfigScreen(
             onDismissRequest = { showRestoreDialog = false },
             title = {
                 Text(
-                    text = stringResource(R.string.susfs_restore_title),
+                    text = stringResource(R.string.restore),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
@@ -1839,7 +1904,7 @@ private fun BasicSettingsContent(
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    stringResource(R.string.susfs_restore_title),
+                    stringResource(R.string.restore),
                     fontWeight = FontWeight.Medium
                 )
             }

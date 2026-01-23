@@ -495,7 +495,7 @@
     <string name="susfs_backup_file_not_found">File backup tidak ditemukan</string>
     <string name="susfs_backup_invalid_format">Format file backup tidak valid</string>
     <string name="susfs_backup_version_mismatch">Versi backup tidak cocok, tetapi akan mencoba memulihkan</string>
-    <string name="susfs_restore_title">Pulihkan</string>
+    <string name="restore">Pulihkan</string>
     <string name="susfs_restore_description">Pulihkan konfigurasi SuSFS dari file backup. Ini akan menimpa semua pengaturan saat ini.</string>
     <string name="susfs_restore_select_file">Pilih File Backup</string>
     <string name="susfs_restore_success" formatted="false">Konfigurasi berhasil dipulihkan dari backup yang dibuat pada %s dari perangkat: %s</string>

@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
@@ -50,6 +51,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
@@ -314,19 +316,34 @@ fun SettingsTextFieldWidget(
                 outputTransformation = outputTransformation,
                 scrollState = scrollState,
                 decorator = { innerTextField ->
-                    Box(
-                        modifier = Modifier.clickable {
-                            onClickInternal()
+                    Column {
+                        Box(
+                            modifier = Modifier.clickable(
+                                enabled = onClick != null
+                            ) {
+                                onClickInternal()
+                            }
+                        ) {
+                            if (showPlaceholder) {
+                                Text(
+                                    text = title,
+                                    style = textStyle,
+                                    color = labelColor.copy(alpha = 0.6f),
+                                )
+                            }
+                            innerTextField()
                         }
-                    ) {
-                        if (showPlaceholder) {
-                            Text(
-                                text = title,
-                                style = textStyle,
-                                color = labelColor.copy(alpha = 0.6f),
-                            )
-                        }
-                        innerTextField()
+
+                        Spacer(modifier = Modifier.height(2.dp))
+
+                        HorizontalDivider(
+                            thickness = if (isFocused) 2.dp else 1.dp,
+                            color = when {
+                                !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                                isFocused -> MaterialTheme.colorScheme.primary
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                            }
+                        )
                     }
                 }
             )

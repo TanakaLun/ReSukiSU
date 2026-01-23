@@ -513,7 +513,7 @@
     <string name="susfs_backup_file_not_found">Backup file not found</string>
     <string name="susfs_backup_invalid_format">Invalid backup file format</string>
     <string name="susfs_backup_version_mismatch">Backup version mismatch, but will attempt to restore</string>
-    <string name="susfs_restore_title">Restore</string>
+    <string name="restore">Restore</string>
     <string name="susfs_restore_description">Restore SuSFS configurations from a backup file. This will overwrite all current settings</string>
     <string name="susfs_restore_select_file">Select Backup File</string>
     <string name="susfs_restore_success" formatted="false">Configuration restored successfully from backup created on %s from device: %s</string>
@@ -750,6 +750,7 @@ Important Note:\n
     <string name="module_shortcut_icon_pick">Choose custom icon</string>
     <string name="module_shortcut_add">Add shortcut</string>
     <string name="module_shortcut_not_supported">Launcher does not support desktop shortcuts.</string>
+    <string name="module_shortcut_should_not_empty">"Desktop shortcuts shouldn't is empty"</string>
     <string name="module_shortcut_created">Shortcut created on desktop.</string>
     <string name="module_shortcut_updated">Shortcut updated.</string>
     <string name="module_shortcut_delete">Delete shortcut</string>

@@ -485,7 +485,7 @@
     <string name="susfs_backup_file_not_found">Файл резервної копії не знайдено</string>
     <string name="susfs_backup_invalid_format">Недійсний формат файлу резервної копії</string>
     <string name="susfs_backup_version_mismatch">Невідповідність версії резервної копії, але буде зроблена спроба відновлення</string>
-    <string name="susfs_restore_title">Відновлення</string>
+    <string name="restore">Відновлення</string>
     <string name="susfs_restore_description">Відновити конфігурації SuSFS з файлу резервної копії. Це перезапише всі поточні налаштування.</string>
     <string name="susfs_restore_select_file">Вибрати файл резервної копії</string>
     <string name="susfs_restore_success" formatted="false">Конфігурацію успішно відновлено з резервної копії, створеної %s на пристрої: %s</string>

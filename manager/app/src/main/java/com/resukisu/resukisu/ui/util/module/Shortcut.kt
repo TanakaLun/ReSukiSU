@@ -1,6 +1,7 @@
 package com.resukisu.resukisu.ui.util.module
 
 import android.app.AppOpsManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Context.MODE_PRIVATE
 import android.content.Intent
@@ -35,8 +36,14 @@ object Shortcut {
         name: String,
         iconUri: String?
     ) {
+        val prefs = context.getSharedPreferences("settings", MODE_PRIVATE)
+        val usingAltIcon = prefs.getBoolean("use_alt_icon", false)
+        val mainActivity = ComponentName(context, MainActivity::class.java.name)
+        val mainActivityAlias = ComponentName(context, "${MainActivity::class.java.name}Alias")
+
         val shortcutId = "module_action_$moduleId"
-        val shortcutIntent = Intent(context, MainActivity::class.java).apply {
+        val shortcutIntent = Intent().apply {
+            component = if (usingAltIcon) mainActivityAlias else mainActivity
             action = Intent.ACTION_VIEW
             putExtra("shortcut_type", "module_action")
             putExtra("module_id", moduleId)

@@ -502,7 +502,7 @@
     <string name="susfs_backup_file_not_found">Yedekleme dosyası bulunamadı</string>
     <string name="susfs_backup_invalid_format">Geçersiz yedekleme dosyası formatı</string>
     <string name="susfs_backup_version_mismatch">Yedekleme sürümü uyuşmuyor, ancak geri yüklemeye çalışılacak</string>
-    <string name="susfs_restore_title">Geri Yükle</string>
+    <string name="restore">Geri Yükle</string>
     <string name="susfs_restore_description">SuSFS yapılandırmalarını bir yedekleme dosyasından geri yükleyin. Bu, tüm mevcut ayarların üzerine yazacaktır.</string>
     <string name="susfs_restore_select_file">Yedekleme Dosyası Seç</string>
     <string name="susfs_restore_success" formatted="false">%s tarihinde %s cihazından oluşturulan yedekten yapılandırma başarıyla geri yüklendi</string>

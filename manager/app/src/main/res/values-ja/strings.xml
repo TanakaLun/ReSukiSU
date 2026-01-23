@@ -494,7 +494,7 @@
     <string name="susfs_backup_file_not_found">バックアップファイルが見つかりません</string>
     <string name="susfs_backup_invalid_format">無効なバックアップファイル形式</string>
     <string name="susfs_backup_version_mismatch">バックアップのバージョンが一致しませんが、復元を試みます。</string>
-    <string name="susfs_restore_title">復元</string>
+    <string name="restore">復元</string>
     <string name="susfs_restore_description">SuSFS の構成をバックアップファイルから復元します。これにより、現在の設定がすべて上書きされます。</string>
     <string name="susfs_restore_select_file">バックアップファイルを選択</string>
     <string name="susfs_restore_success" formatted="false">デバイス: %s から「%s」に作成されたバックアップから構成が正常に復元されました。</string>

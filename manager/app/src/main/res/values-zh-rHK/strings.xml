@@ -484,7 +484,7 @@
     <string name="susfs_backup_file_not_found">搵唔到備份檔案</string>
     <string name="susfs_backup_invalid_format">備份檔案格式無效</string>
     <string name="susfs_backup_version_mismatch">備份版本唔一樣，但會嘗試還原</string>
-    <string name="susfs_restore_title">還原</string>
+    <string name="restore">還原</string>
     <string name="susfs_restore_description">由備份檔案還原 SuSFS 配置。呢個動作會覆蓋晒而家所有配置。</string>
     <string name="susfs_restore_select_file">揀備份檔案</string>
     <string name="susfs_restore_success" formatted="false">配置還原成功，備份建立於 %s，嚟自裝置：%s</string>

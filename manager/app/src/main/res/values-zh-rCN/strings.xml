@@ -510,7 +510,7 @@
     <string name="susfs_backup_file_not_found">备份文件未找到</string>
     <string name="susfs_backup_invalid_format">无效的备份文件格式</string>
     <string name="susfs_backup_version_mismatch">备份版本不匹配，但将尝试还原</string>
-    <string name="susfs_restore_title">还原</string>
+    <string name="restore">还原</string>
     <string name="susfs_restore_description">从备份文件还原 SuSFS 配置。这将覆盖所有当前设置。</string>
     <string name="susfs_restore_select_file">选择备份文件</string>
     <string name="susfs_restore_success" formatted="false">配置还原成功，备份创建于 %s，来自设备：%s</string>
@@ -739,6 +739,7 @@
     <string name="module_shortcut_icon_pick">选择自定义图标</string>
     <string name="module_shortcut_add">添加快捷方式</string>
     <string name="module_shortcut_not_supported">启动器不支持桌面快捷方式。</string>
+    <string name="module_shortcut_should_not_empty">桌面快捷方式名称不得为空</string>
     <string name="module_shortcut_created">已在桌面创建快捷方式。</string>
     <string name="module_shortcut_updated">快捷方式已更新。</string>
     <string name="module_shortcut_delete">删除快捷方式</string>

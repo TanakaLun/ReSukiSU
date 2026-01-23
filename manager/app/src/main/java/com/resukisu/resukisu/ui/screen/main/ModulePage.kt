@@ -14,14 +14,10 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
@@ -47,13 +43,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Wysiwyg
 import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Cloud
@@ -63,7 +59,9 @@ import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Warning
-import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Photo
+import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ElevatedCard
@@ -115,7 +113,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
@@ -151,7 +148,10 @@ import com.resukisu.resukisu.ui.component.pinnedScrollBehavior
 import com.resukisu.resukisu.ui.component.rememberConfirmDialog
 import com.resukisu.resukisu.ui.component.rememberFabVisibilityState
 import com.resukisu.resukisu.ui.component.rememberLoadingDialog
+import com.resukisu.resukisu.ui.component.settings.SettingsBaseWidget
+import com.resukisu.resukisu.ui.component.settings.SettingsJumpPageWidget
 import com.resukisu.resukisu.ui.component.settings.SettingsTextFieldWidget
+import com.resukisu.resukisu.ui.component.settings.SplicedColumnGroup
 import com.resukisu.resukisu.ui.screen.FlashIt
 import com.resukisu.resukisu.ui.screen.LabelText
 import com.resukisu.resukisu.ui.theme.getCardColors
@@ -1122,6 +1122,7 @@ private fun ModuleList(
                 showShortcutTypeRow.value = false
             }
         ) {
+            var error by remember { mutableStateOf("") }
             Column(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -1132,7 +1133,6 @@ private fun ModuleList(
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier
                         .padding(horizontal = 24.dp)
-                        .padding(bottom = 16.dp)
                 )
                 if (showShortcutTypeRow.value) {
                     PrimaryTabRow(
@@ -1191,53 +1191,80 @@ private fun ModuleList(
                         )
                     }
                 }
-                Row {
-                    OutlinedButton(
-                        modifier = Modifier.weight(1f),
-                        onClick = { pickShortcutIconLauncher.launch("image/*") },
-                    ) {
-                        Text(
-                            text = stringResource(id = R.string.module_shortcut_icon_pick)
-                        )
-                    }
-                    AnimatedVisibility(
-                        visible = shortcutIconUri != defaultShortcutIconUri,
-                        enter = expandHorizontally() + slideInHorizontally(initialOffsetX = { it }),
-                        exit = shrinkHorizontally() + slideOutHorizontally(targetOffsetX = { it }),
-                        modifier = Modifier.align(Alignment.CenterVertically),
-                    ) {
-                        IconButton(
-                            onClick = { shortcutIconUri = defaultShortcutIconUri },
-                            modifier = Modifier.padding(start = 12.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Rounded.Undo,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(28.dp),
-                            )
+                SplicedColumnGroup {
+                    if (shortcutIconUri == defaultShortcutIconUri) {
+                        item {
+                            SettingsBaseWidget(
+                                icon = Icons.Rounded.Photo,
+                                title = stringResource(id = R.string.module_shortcut_icon_pick),
+                                onClick = {
+                                    pickShortcutIconLauncher.launch("image/*")
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.ChevronRight,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+                    } else {
+                        item {
+                            SettingsBaseWidget(
+                                icon = Icons.Rounded.Restore,
+                                title = stringResource(id = R.string.restore),
+                                onClick = {
+                                    shortcutIconUri = defaultShortcutIconUri
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Rounded.Undo,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
                         }
                     }
-                }
-                SettingsTextFieldWidget(
-                    state = textFieldState,
-                    title = stringResource(id = R.string.module_shortcut_name_label)
-                )
-                if (hasExistingShortcut) {
-                    OutlinedButton(
-                        onClick = {
-                            val moduleId = shortcutModuleId
-                            val type = selectedShortcutType
-                            if (!moduleId.isNullOrBlank() && type != null) {
-                                deleteModuleShortcut(context, moduleId, type)
-                            }
-                            showShortcutDialog.value = false
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(
-                            text = stringResource(id = R.string.module_shortcut_delete),
+
+                    item {
+                        val shouldNotEmpty =
+                            stringResource(R.string.module_shortcut_should_not_empty)
+                        SettingsTextFieldWidget(
+                            state = textFieldState,
+                            title = stringResource(id = R.string.module_shortcut_name_label),
+                            trailingContent = {
+                                Text(
+                                    text = error,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            },
                         )
+
+                        LaunchedEffect(textFieldState.text) {
+                            error = if (textFieldState.text.isBlank()) {
+                                shouldNotEmpty
+                            } else ""
+                        }
+                    }
+
+                    if (hasExistingShortcut) {
+                        item {
+                            SettingsJumpPageWidget(
+                                icon = Icons.Rounded.Delete,
+                                title = stringResource(id = R.string.module_shortcut_delete),
+                                onClick = {
+                                    val moduleId = shortcutModuleId
+                                    val type = selectedShortcutType
+                                    if (!moduleId.isNullOrBlank() && type != null) {
+                                        deleteModuleShortcut(context, moduleId, type)
+                                    }
+                                    showShortcutDialog.value = false
+                                },
+                            )
+                        }
                     }
                 }
                 Row(
@@ -1245,7 +1272,9 @@ private fun ModuleList(
                 ) {
                     OutlinedButton(
                         onClick = { showShortcutDialog.value = false },
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(start = 16.dp)
                     ) {
                         Text(
                             text = stringResource(id = android.R.string.cancel),
@@ -1267,7 +1296,10 @@ private fun ModuleList(
                             }
                             showShortcutDialog.value = false
                         },
-                        modifier = Modifier.weight(1f),
+                        enabled = error.isBlank(),
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 16.dp)
                     ) {
                         Text(
                             text = if (hasExistingShortcut) {
@@ -1283,6 +1315,7 @@ private fun ModuleList(
     }
 }
 
+@SuppressLint("LocalContextGetResourceValueCall")
 @Composable
 fun ModuleItem(
     navigator: DestinationsNavigator,
@@ -1310,7 +1343,7 @@ fun ModuleItem(
     ) {
         val textDecoration = if (!module.remove) null else TextDecoration.LineThrough
         val interactionSource = remember { MutableInteractionSource() }
-        val indication = LocalIndication.current
+        LocalIndication.current
         val viewModel = viewModel<ModuleViewModel>()
 
         val sizeStr = viewModel.getModuleSize(module.dirId)
@@ -1318,14 +1351,16 @@ fun ModuleItem(
         Column(
             modifier = Modifier
                 .run {
-                    if (module.hasWebUi) {
-                        toggleable(
-                            value = module.enabled,
-                            enabled = !module.remove && module.enabled,
-                            interactionSource = interactionSource,
-                            role = Role.Button,
-                            indication = indication,
-                            onValueChange = { onClick(module) }
+                    if (module.hasActionScript || module.hasWebUi) {
+                        combinedClickable(
+                            onLongClick = {
+                                onModuleAddShortcut(module)
+                            },
+                            onClick = {
+                                if (module.hasWebUi) {
+                                    onClick(module)
+                                }
+                            }
                         )
                     } else {
                         this
@@ -1524,22 +1559,6 @@ fun ModuleItem(
                             modifier = Modifier.size(20.dp),
                             imageVector = Icons.AutoMirrored.Outlined.Wysiwyg,
                             contentDescription = null
-                        )
-                    }
-                }
-
-                if (module.hasActionScript || module.hasWebUi) {
-                    FilledTonalButton(
-                        modifier = Modifier.defaultMinSize(minWidth = 52.dp, minHeight = 32.dp),
-                        enabled = !module.remove && module.enabled,
-                        onClick = { onModuleAddShortcut(module) },
-                        interactionSource = interactionSource,
-                        contentPadding = ButtonDefaults.TextButtonContentPadding,
-                    ) {
-                        Icon(
-                            modifier = Modifier.size(20.dp),
-                            imageVector = Icons.Rounded.Add,
-                            contentDescription = stringResource(R.string.module_shortcut_add)
                         )
                     }
                 }

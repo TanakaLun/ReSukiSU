@@ -502,7 +502,7 @@
     <string name="susfs_backup_file_not_found">Không tìm thấy file sao lưu</string>
     <string name="susfs_backup_invalid_format">Định dạng file sao lưu không hợp lệ</string>
     <string name="susfs_backup_version_mismatch">Phiên bản sao lưu không khớp, nhưng sẽ cố gắng khôi phục</string>
-    <string name="susfs_restore_title">Khôi phục</string>
+    <string name="restore">Khôi phục</string>
     <string name="susfs_restore_description">Khôi phục cấu hình SuSFS từ file sao lưu. Thao tác này sẽ ghi đè lên tất cả các cài đặt hiện tại</string>
     <string name="susfs_restore_select_file">Chọn file sao lưu</string>
     <string name="susfs_restore_success" formatted="false">Cấu hình đã được khôi phục thành công từ bản sao lưu được tạo trên %s, từ thiết bị: %s</string>

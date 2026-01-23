@@ -490,7 +490,7 @@ Tanamkan: Secara permanen memasang ke sistem</string>
     <string name="susfs_backup_file_not_found">File cadangan tidak ditemukan</string>
     <string name="susfs_backup_invalid_format">Format file cadangan tidak valid</string>
     <string name="susfs_backup_version_mismatch">Versi cadangan tidak cocok, tetapi akan dicoba untuk dipulihkan</string>
-    <string name="susfs_restore_title">Pulihkan</string>
+    <string name="restore">Pulihkan</string>
     <string name="susfs_restore_description">Pulihkan konfigurasi SuSFS dari file cadangan. Ini akan menimpa semua pengaturan saat ini.</string>
     <string name="susfs_restore_select_file">Pilih File Cadangan</string>
     <string name="susfs_restore_success" formatted="false">Konfigurasi berhasil dipulihkan dari cadangan yang dibuat %s pada perangkat: %s</string>
