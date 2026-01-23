@@ -1234,13 +1234,7 @@ private fun ModuleList(
                         SettingsTextFieldWidget(
                             state = textFieldState,
                             title = stringResource(id = R.string.module_shortcut_name_label),
-                            trailingContent = {
-                                Text(
-                                    text = error,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.error
-                                )
-                            },
+                            error = error,
                         )
 
                         LaunchedEffect(textFieldState.text) {

@@ -5,9 +5,11 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
@@ -232,6 +234,7 @@ fun SettingsTextFieldWidget(
     state: TextFieldState,
     onClick: (() -> Unit)? = null,
     title: String = "",
+    error: String = "",
     labelColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     useLabelAsPlaceholder: Boolean = false,
     enabled: Boolean = true,
@@ -302,11 +305,12 @@ fun SettingsTextFieldWidget(
                     .focusRequester(focusRequester)
                     .focusProperties {
                         canFocus = !isClickableMode
-                    },
+                    }
+                    .padding(top = 5.dp),
                 enabled = enabled,
                 readOnly = readOnly,
                 textStyle = textStyle,
-                cursorBrush = cursorBrush,
+                cursorBrush = if (error.isBlank()) cursorBrush else SolidColor(MaterialTheme.colorScheme.error),
                 keyboardOptions = keyboardOptions,
                 onKeyboardAction = onKeyboardAction,
                 lineLimits = lineLimits,
@@ -319,7 +323,7 @@ fun SettingsTextFieldWidget(
                     Column {
                         Box(
                             modifier = Modifier.clickable(
-                                enabled = onClick != null
+                                enabled = onClick != null || !isFocused
                             ) {
                                 onClickInternal()
                             }
@@ -331,22 +335,74 @@ fun SettingsTextFieldWidget(
                                     color = labelColor.copy(alpha = 0.6f),
                                 )
                             }
+
+                            if (error.isNotBlank() && !isFocused && state.text.isBlank()) {
+                                Text(
+                                    text = error,
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+
                             innerTextField()
                         }
 
-                        Spacer(modifier = Modifier.height(2.dp))
+                        AnimatedVisibility(
+                            visible = isFocused,
+                            enter = expandHorizontally(
+                                animationSpec = spring(stiffness = SharedStiffness),
+                                expandFrom = Alignment.Start // Unroll downwards like a blind
+                            ) + expandVertically(
+                                animationSpec = spring(stiffness = SharedStiffness),
+                                expandFrom = Alignment.Top // Unroll downwards like a blind
+                            ),
+                            exit = shrinkHorizontally(
+                                animationSpec = spring(stiffness = SharedStiffness),
+                                shrinkTowards = Alignment.Start // Roll up upwards
+                            ) + shrinkVertically(
+                                animationSpec = spring(stiffness = SharedStiffness),
+                                shrinkTowards = Alignment.Top // Unroll downwards like a blind
+                            )
+                        ) {
+                            Spacer(modifier = Modifier.height(2.dp))
 
-                        HorizontalDivider(
-                            thickness = if (isFocused) 2.dp else 1.dp,
-                            color = when {
-                                !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
-                                isFocused -> MaterialTheme.colorScheme.primary
-                                else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                            }
-                        )
+                            HorizontalDivider(
+                                thickness = 2.dp,
+                                color = when {
+                                    error.isNotBlank() -> MaterialTheme.colorScheme.error
+                                    !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                                    else -> MaterialTheme.colorScheme.primary
+                                }
+                            )
+                        }
                     }
                 }
             )
+
+            AnimatedVisibility(
+                visible = error.isNotBlank() && (isFocused || state.text.isNotBlank()),
+                enter = expandHorizontally(
+                    animationSpec = spring(stiffness = SharedStiffness),
+                    expandFrom = Alignment.Start // Unroll downwards like a blind
+                ) + expandVertically(
+                    animationSpec = spring(stiffness = SharedStiffness),
+                    expandFrom = Alignment.Top // Unroll downwards like a blind
+                ),
+                exit = shrinkHorizontally(
+                    animationSpec = spring(stiffness = SharedStiffness),
+                    shrinkTowards = Alignment.Start // Roll up upwards
+                ) + shrinkVertically(
+                    animationSpec = spring(stiffness = SharedStiffness),
+                    shrinkTowards = Alignment.Top // Unroll downwards like a blind
+                )
+            ) {
+                Text(
+                    modifier = Modifier.padding(top = 2.dp),
+                    text = error,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
         },
         content = {
             trailingContent?.invoke()
@@ -464,6 +520,7 @@ class SplicedGroupScope {
 
 private val CornerRadius = 16.dp
 private val ConnectionRadius = 5.dp
+private const val SharedStiffness = Spring.StiffnessMediumLow
 
 /**
  * A container that groups items with a spliced, continuous look (similar to M3 Expressive).
@@ -504,7 +561,6 @@ fun SplicedColumnGroup(
             // Use a shared stiffness constant for all animations (layout, fade, and shape morphing).
             // This ensures the physics feel connected and synchronized, preventing "ghosting" artifacts
             // where content fades out before the layout collapses.
-            val sharedStiffness = Spring.StiffnessMediumLow
 
             allItems.forEachIndexed { index, itemData ->
                 // Using a stable key is mandatory for correct AnimatedVisibility behavior in lists.
@@ -519,16 +575,16 @@ fun SplicedColumnGroup(
                         visible = itemData.visible,
                         modifier = Modifier.zIndex(zIndex),
                         enter = expandVertically(
-                            animationSpec = spring(stiffness = sharedStiffness),
+                            animationSpec = spring(stiffness = SharedStiffness),
                             expandFrom = Alignment.Top // Unroll downwards like a blind
                         ) + fadeIn(
-                            animationSpec = spring(stiffness = sharedStiffness)
+                            animationSpec = spring(stiffness = SharedStiffness)
                         ),
                         exit = shrinkVertically(
-                            animationSpec = spring(stiffness = sharedStiffness),
+                            animationSpec = spring(stiffness = SharedStiffness),
                             shrinkTowards = Alignment.Top // Roll up upwards
                         ) + fadeOut(
-                            animationSpec = spring(stiffness = sharedStiffness)
+                            animationSpec = spring(stiffness = SharedStiffness)
                         )
                     ) {
                         val isFirst = index == firstVisibleIndex
@@ -542,12 +598,12 @@ fun SplicedColumnGroup(
                         // Animate shape changes to match the enter/exit physics.
                         val animatedTopRadius by animateDpAsState(
                             targetValue = targetTopRadius,
-                            animationSpec = spring(stiffness = sharedStiffness),
+                            animationSpec = spring(stiffness = SharedStiffness),
                             label = "TopCornerRadius"
                         )
                         val animatedBottomRadius by animateDpAsState(
                             targetValue = targetBottomRadius,
-                            animationSpec = spring(stiffness = sharedStiffness),
+                            animationSpec = spring(stiffness = SharedStiffness),
                             label = "BottomCornerRadius"
                         )
 
