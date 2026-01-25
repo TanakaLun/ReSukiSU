@@ -6,12 +6,10 @@ import android.content.Context
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
 import com.resukisu.resukisu.R
-import com.resukisu.resukisu.network.RemoteToolsDownloader
 import com.resukisu.resukisu.ui.util.install
 import com.resukisu.resukisu.ui.util.rootAvailable
 import com.resukisu.resukisu.utils.AssetsUtil
 import com.topjohnwu.superuser.Shell
-import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -94,7 +92,6 @@ class HorizonKernelWorker(
 
     private var onFlashComplete: (() -> Unit)? = null
     private var originalSlot: String? = null
-    private var downloaderJob: Job? = null
 
     fun setOnFlashCompleteListener(listener: () -> Unit) {
         onFlashComplete = listener
@@ -135,7 +132,7 @@ class HorizonKernelWorker(
             if (kpmPatchEnabled || kpmUndoPatch) {
                 state.updateStep(context.getString(R.string.kpm_preparing_tools))
                 state.updateProgress(0.5f)
-                prepareKpmToolsWithDownload()
+                prepareKpmTools()
 
                 state.updateStep(
                     if (kpmUndoPatch) context.getString(R.string.kpm_undoing_patch)
@@ -192,80 +189,10 @@ class HorizonKernelWorker(
                 state.updateProgress(0.8f)
                 runCommand(true, "resetprop ro.boot.slot_suffix $originalSlot")
             }
-        } finally {
-            // 取消下载任务并清理
-            downloaderJob?.cancel()
-            cleanupDownloader()
         }
     }
 
-    private fun prepareKpmToolsWithDownload() {
-        try {
-            File(workDir).mkdirs()
-            val downloader = RemoteToolsDownloader(context, workDir)
-
-            val progressListener = object : RemoteToolsDownloader.DownloadProgressListener {
-                override fun onProgress(fileName: String, progress: Int, total: Int) {
-                    val percentage = if (total > 0) (progress * 100) / total else 0
-                    state.addLog("Downloading $fileName: $percentage% ($progress/$total bytes)")
-                }
-
-                override fun onLog(message: String) {
-                    state.addLog(message)
-                }
-
-                override fun onError(fileName: String, error: String) {
-                    state.addLog("Warning: $fileName - $error")
-                }
-
-                override fun onSuccess(fileName: String, isRemote: Boolean) {
-                    val source = if (isRemote) "remote" else "local"
-                    state.addLog("✓ $fileName $source version prepared successfully")
-                }
-            }
-
-            val downloadJob = CoroutineScope(Dispatchers.IO).launch {
-                downloader.downloadToolsAsync(progressListener)
-            }
-
-            downloaderJob = downloadJob
-
-            runBlocking {
-                downloadJob.join()
-            }
-
-            val kptoolsPath = "$workDir/kptools"
-            val kpimgPath = "$workDir/kpimg"
-
-            if (!File(kptoolsPath).exists()) {
-                throw IOException("kptools file preparation failed")
-            }
-
-            if (!File(kpimgPath).exists()) {
-                throw IOException("kpimg file preparation failed")
-            }
-
-            runCommand(true, "chmod a+rx $kptoolsPath")
-            state.addLog("KPM tools preparation completed, starting patch operation")
-
-        } catch (_: CancellationException) {
-            state.addLog("KPM tools download cancelled")
-            throw IOException("Tool preparation process interrupted")
-        } catch (e: Exception) {
-            state.addLog("KPM tools preparation failed: ${e.message}")
-
-            state.addLog("Attempting to use legacy local file extraction...")
-            try {
-                prepareKpmToolsLegacy()
-                state.addLog("Successfully used local backup files")
-            } catch (legacyException: Exception) {
-                state.addLog("Local file extraction also failed: ${legacyException.message}")
-                throw IOException("Unable to prepare KPM tool files: ${e.message}")
-            }
-        }
-    }
-
-    private fun prepareKpmToolsLegacy() {
+    private fun prepareKpmTools() {
         File(workDir).mkdirs()
 
         val kptoolsPath = "$workDir/kptools"
@@ -282,14 +209,6 @@ class HorizonKernelWorker(
         }
 
         runCommand(true, "chmod a+rx $kptoolsPath")
-    }
-
-    private fun cleanupDownloader() {
-        try {
-            val downloader = RemoteToolsDownloader(context, workDir)
-            downloader.cleanup()
-        } catch (_: Exception) {
-        }
     }
 
     /**
