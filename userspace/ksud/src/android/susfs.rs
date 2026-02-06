@@ -41,7 +41,7 @@ pub fn get_susfs_version() -> String {
     let ver = String::from_utf8(cmd.susfs_version[..ver].to_vec())
         .unwrap_or_else(|_| "<invalid>".to_string());
 
-    if ver.starts_with("v") {
+    if ver.starts_with('v') {
         ver
     } else {
         "unsupport".to_string()
