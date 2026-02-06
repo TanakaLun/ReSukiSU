@@ -453,28 +453,31 @@ fun ReleaseCard(module: ModuleRepoViewModel.RepoModule, release: ReleaseInfo, co
 
             Column {
                 release.assets.forEach { assetInfo ->
+                    val onClick: () -> Unit = {
+                        coroutineScope.launch {
+                            val result = confirmDialog.awaitConfirm(
+                                title = confirmInstallTitle,
+                                html = true,
+                                content = release.descriptionHTML
+                            )
+
+                            if (result == ConfirmResult.Canceled) return@launch
+
+                            downloadAssetAndInstall(
+                                context,
+                                module,
+                                assetInfo,
+                                navigator,
+                                coroutineScope
+                            )
+                        }
+                    }
                     SettingsBaseWidget(
                         modifier = Modifier.clip(RoundedCornerShape(12.dp)),
                         title = assetInfo.name,
                         noVerticalPadding = true,
                         onClick = {
-                            coroutineScope.launch {
-                                val result = confirmDialog.awaitConfirm(
-                                    title = confirmInstallTitle,
-                                    html = true,
-                                    content = release.descriptionHTML
-                                )
-
-                                if (result == ConfirmResult.Canceled) return@launch
-
-                                downloadAssetAndInstall(
-                                    context,
-                                    module,
-                                    assetInfo,
-                                    navigator,
-                                    coroutineScope
-                                )
-                            }
+                            onClick()
                         },
                         iconPlaceholder = false,
                         description = stringResource(R.string.assert_support_content).format(
@@ -483,7 +486,7 @@ fun ReleaseCard(module: ModuleRepoViewModel.RepoModule, release: ReleaseInfo, co
                         )
                     ) {
                         FilledTonalButton(
-                            onClick = {},
+                            onClick = onClick,
                             contentPadding = ButtonDefaults.TextButtonContentPadding,
                         ) {
                             Icon(
