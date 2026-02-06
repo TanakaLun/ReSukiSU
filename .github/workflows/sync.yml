@@ -1,15 +1,17 @@
 name: Scheduled Repo Sync
+
 on:
   schedule:
     - cron: '0 * * * *'
   workflow_dispatch:
 
 jobs:
-  sync:
+  sync_and_check:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      actions: write
+    outputs:
+      has_updates: ${{ steps.check_step.outputs.has_updates }}
     
     steps:
       - name: Checkout
@@ -17,34 +19,29 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Configure Git
+      - name: Configure Git Bot
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Sync Upstream
-        id: sync_step
+      - name: Sync and Detect Updates
+        id: check_step
         run: |
           git remote add upstream https://github.com/ReSukiSU/ReSukiSU.git
           git fetch upstream
           
-          LOCAL_SHA=$(git rev-parse HEAD)
-          UPSTREAM_SHA=$(git rev-parse upstream/main)
+          COUNT=$(git rev-list --count HEAD..upstream/main)
           
-          if [ "$LOCAL_SHA" == "$UPSTREAM_SHA" ]; then
-            echo "has_updates=false" >> $GITHUB_ENV
-            echo "No updates found. Skipping build."
-          else
+          if [ "$COUNT" -gt 0 ]; then
             git checkout main
             git merge upstream/main --no-edit --allow-unrelated-histories
             git push origin main
-            echo "has_updates=true" >> $GITHUB_ENV
+            echo "has_updates=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_updates=false" >> $GITHUB_OUTPUT
           fi
-          
-      - name: Trigger Build Workflow
-        if: env.has_updates == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "Triggering Build Manager..."
-          gh workflow run build-manager.yml
+  trigger-build:
+    needs: sync_and_check
+    if: needs.sync_and_check.outputs.has_updates == 'true'
+    uses: ./.github/workflows/build-manager.yml
+    secrets: inherit
