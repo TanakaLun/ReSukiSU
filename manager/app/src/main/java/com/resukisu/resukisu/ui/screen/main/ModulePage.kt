@@ -391,6 +391,32 @@ fun ModulePage(navigator: DestinationsNavigator, bottomPadding: Dp, hazeState: H
                     }
                 }
             }
+            viewModel.moduleList.isEmpty() -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Extension,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(96.dp)
+                                .padding(bottom = 16.dp)
+                        )
+                        Text(
+                            text = stringResource(R.string.module_empty),
+                            textAlign = TextAlign.Center,
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                    }
+                }
+            }
             else -> {
                 ModuleList(
                     navigator = navigator,
@@ -978,7 +1004,7 @@ private fun ModuleList(
             contentPadding = remember {
                 PaddingValues(
                     start = 16.dp,
-                    top = 16.dp,
+                    top = 0.dp,
                     end = 16.dp,
                     bottom = 65.dp
                 )
@@ -996,100 +1022,68 @@ private fun ModuleList(
                 }
             }
 
-            when {
-                viewModel.moduleList.isEmpty() -> {
-                    item {
-                        Box(
-                            modifier = Modifier.fillParentMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Extension,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
-                                    modifier = Modifier
-                                        .size(96.dp)
-                                        .padding(bottom = 16.dp)
-                                )
-                                Text(
-                                    text = stringResource(R.string.module_empty),
-                                    textAlign = TextAlign.Center,
-                                    style = MaterialTheme.typography.bodyLarge,
+            items(
+                items = viewModel.moduleList,
+                key = { "module-$it.id" }
+            ) { module ->
+                ModuleItem(
+                    viewModel = viewModel,
+                    navigator = navigator,
+                    module = module,
+                    updateUrl = module.moduleUpdate?.zipUrl.orEmpty(),
+                    onUninstallClicked = {
+                        viewModel.viewModelScope.launch {
+                            withContext(Dispatchers.IO) {
+                                onModuleUninstallClicked(module)
+                            }
+                        }
+                    },
+                    onCheckChanged = {
+                        viewModel.viewModelScope.launch {
+                            withContext(Dispatchers.IO) {
+                                val success = withContext(Dispatchers.IO) {
+                                    toggleModule(module.dirId, !module.enabled)
+                                }
+                                if (success) {
+                                    viewModel.fetchModuleList()
+
+                                    val result = snackBarHost.showSnackbar(
+                                        message = rebootToApply,
+                                        actionLabel = reboot,
+                                        duration = SnackbarDuration.Long
+                                    )
+                                    if (result == SnackbarResult.ActionPerformed) {
+                                        reboot()
+                                    }
+                                } else {
+                                    val message =
+                                        if (module.enabled) failedDisable else failedEnable
+                                    snackBarHost.showSnackbar(message.format(module.name))
+                                }
+                            }
+                        }
+                    },
+                    onUpdate = {
+                        viewModel.viewModelScope.launch {
+                            withContext(Dispatchers.IO) {
+                                onModuleUpdate(
+                                    module,
+                                    module.moduleUpdate!!.changelog,
+                                    module.moduleUpdate.zipUrl,
+                                    "${module.name}-${module.moduleUpdate.version}.zip"
                                 )
                             }
                         }
+                    },
+                    onClick = {
+                        onClickModule(it.dirId, it.name, it.hasWebUi)
+                    },
+                    onModuleAddShortcut = {
+                        onModuleAddShortcut(it)
                     }
-                }
+                )
 
-                else -> {
-                    items(
-                        items = viewModel.moduleList,
-                        key = { "module-$it.id" }
-                    ) { module ->
-                        ModuleItem(
-                            viewModel = viewModel,
-                            navigator = navigator,
-                            module = module,
-                            updateUrl = module.moduleUpdate?.zipUrl.orEmpty(),
-                            onUninstallClicked = {
-                                viewModel.viewModelScope.launch {
-                                    withContext(Dispatchers.IO) {
-                                        onModuleUninstallClicked(module)
-                                    }
-                                }
-                            },
-                            onCheckChanged = {
-                                viewModel.viewModelScope.launch {
-                                    withContext(Dispatchers.IO) {
-                                        val success = withContext(Dispatchers.IO) {
-                                            toggleModule(module.dirId, !module.enabled)
-                                        }
-                                        if (success) {
-                                            viewModel.fetchModuleList()
-
-                                            val result = snackBarHost.showSnackbar(
-                                                message = rebootToApply,
-                                                actionLabel = reboot,
-                                                duration = SnackbarDuration.Long
-                                            )
-                                            if (result == SnackbarResult.ActionPerformed) {
-                                                reboot()
-                                            }
-                                        } else {
-                                            val message =
-                                                if (module.enabled) failedDisable else failedEnable
-                                            snackBarHost.showSnackbar(message.format(module.name))
-                                        }
-                                    }
-                                }
-                            },
-                            onUpdate = {
-                                viewModel.viewModelScope.launch {
-                                    withContext(Dispatchers.IO) {
-                                        onModuleUpdate(
-                                            module,
-                                            module.moduleUpdate!!.changelog,
-                                            module.moduleUpdate.zipUrl,
-                                            "${module.name}-${module.moduleUpdate.version}.zip"
-                                        )
-                                    }
-                                }
-                            },
-                            onClick = {
-                                onClickModule(it.dirId, it.name, it.hasWebUi)
-                            },
-                            onModuleAddShortcut = {
-                                onModuleAddShortcut(it)
-                            }
-                        )
-
-                        Spacer(Modifier.height(1.dp))
-                    }
-                }
+                Spacer(Modifier.height(1.dp))
             }
 
             item {

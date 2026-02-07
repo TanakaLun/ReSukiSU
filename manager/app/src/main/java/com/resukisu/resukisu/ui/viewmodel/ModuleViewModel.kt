@@ -15,6 +15,8 @@ import com.resukisu.resukisu.ui.util.HanziToPinyin
 import com.resukisu.resukisu.ui.util.getRootShell
 import com.resukisu.resukisu.ui.util.listModules
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -184,12 +186,19 @@ class ModuleViewModel : ViewModel() {
                             actionIconPath = obj.optString("actionIcon").takeIf { it.isNotBlank() },
                             webUiIconPath = obj.optString("webuiIcon").takeIf { it.isNotBlank() },
                             dirId = obj.optString("dir_id", obj.getString("id")),
-                            moduleUpdate = if (!moduleList.contains(moduleId + moduleVersionCode) || updateJson.isEmpty() || remove || update || !enabled)
-                                checkUpdate(updateJson, moduleVersionCode)
-                            else
-                                null
+                            moduleUpdate = null // we null moduleUpdate there, because checkUpdate may request network
                         )
                     }.toList()
+
+                modules = modules.map { module ->
+                    async(Dispatchers.IO) {
+                        module.copy(
+                            moduleUpdate = if (!moduleList.contains(module.id + module.versionCode) || module.updateJson.isEmpty() || module.remove || module.update || !module.enabled)
+                                checkUpdate(module.updateJson, module.versionCode)
+                            else null
+                        )
+                    }
+                }.awaitAll()
 
                 isNeedRefresh = false
             }.onFailure { e ->
