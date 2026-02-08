@@ -76,7 +76,7 @@ class WebUIXActivity : ComponentActivity() {
                         return@LaunchedEffect
                     }
 
-                    if (!moduleInfo.hasWebUi || !moduleInfo.enabled || moduleInfo.update || moduleInfo.remove) {
+                    if (!moduleInfo.hasWebUi || !moduleInfo.enabled || moduleInfo.remove) {
                         Toast.makeText(
                             this@WebUIXActivity,
                             getString(R.string.module_unavailable, moduleInfo.name),
