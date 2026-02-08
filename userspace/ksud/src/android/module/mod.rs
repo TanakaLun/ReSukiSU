@@ -1,8 +1,6 @@
 pub mod metamodule;
 pub mod module_config;
 
-#[cfg(all(target_os = "android", target_arch = "aarch64"))]
-use std::fs;
 #[cfg(unix)]
 use std::os::unix::{prelude::PermissionsExt, process::CommandExt};
 use std::{
