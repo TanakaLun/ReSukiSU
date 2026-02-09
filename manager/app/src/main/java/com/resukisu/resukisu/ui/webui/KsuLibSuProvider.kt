@@ -1,18 +1,17 @@
 package com.resukisu.resukisu.ui.webui
 
+import android.content.Context
 import android.content.ServiceConnection
-import android.util.Log
 import com.dergoogler.mmrl.platform.Platform
+import com.dergoogler.mmrl.platform.Platform.Companion.createPlatformIntent
+import com.dergoogler.mmrl.platform.PlatformManager
 import com.dergoogler.mmrl.platform.model.IProvider
-import com.dergoogler.mmrl.platform.model.PlatformIntent
 import com.resukisu.resukisu.Natives
-import com.resukisu.resukisu.ksuApp
 import com.topjohnwu.superuser.ipc.RootService
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
 
-class KsuLibSuProvider : IProvider {
+class KsuLibSuProvider(
+    private val context: Context,
+) : IProvider {
     override val name = "KsuLibSu"
 
     override fun isAvailable() = true
@@ -20,37 +19,22 @@ class KsuLibSuProvider : IProvider {
     override suspend fun isAuthorized() = Natives.isManager
 
     private val serviceIntent
-        get() = PlatformIntent(
-            ksuApp,
-            Platform.KsuNext,
-            SuService::class.java
-        )
+        get() = context.createPlatformIntent<SuService>(Platform.SukiSU)
 
     override fun bind(connection: ServiceConnection) {
-        RootService.bind(serviceIntent.intent, connection)
+        RootService.bind(serviceIntent, connection)
     }
 
     override fun unbind(connection: ServiceConnection) {
-        RootService.stop(serviceIntent.intent)
+        RootService.stop(serviceIntent)
     }
 }
 
 // webui x
-suspend fun initPlatform() = withContext(Dispatchers.IO) {
-    try {
-        val active = Platform.init {
-            this.context = ksuApp
-            this.platform = Platform.KsuNext
-            this.provider = from(KsuLibSuProvider())
-        }
-
-        while (!active) {
-            delay(1000)
-        }
-
-        return@withContext true
-    } catch (e: Exception) {
-        Log.e("KsuLibSu", "Failed to initialize platform", e)
-        return@withContext false
+suspend fun initPlatform(
+    context: Context
+) {
+    PlatformManager.init {
+        PlatformManager.from(KsuLibSuProvider(context))
     }
 }

@@ -7,13 +7,13 @@ import android.os.Looper
 import android.text.TextUtils
 import android.view.Window
 import android.webkit.JavascriptInterface
+import android.webkit.WebView
 import android.widget.Toast
 import androidx.core.content.pm.PackageInfoCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.dergoogler.mmrl.webui.interfaces.WXInterface
 import com.dergoogler.mmrl.webui.interfaces.WXOptions
-import com.dergoogler.mmrl.webui.model.JavaScriptInterface
 import com.resukisu.resukisu.ui.util.controlKpmModule
 import com.resukisu.resukisu.ui.util.createRootShell
 import com.resukisu.resukisu.ui.util.listKpmModules
@@ -29,29 +29,65 @@ import java.io.File
 import java.util.concurrent.CompletableFuture
 
 @Suppress("unused")
-class WebViewInterface(
+class WebUIXWebviewInterfaceWrapper(
     wxOptions: WXOptions,
-) : WXInterface(wxOptions) {
-    override var name: String = "ksu"
+    private val delegate: WebUIXWebViewInterfaceImpl
+) : WXInterface(wxOptions), WebViewInterface by delegate {
+    override var name = "ksu"
+    override var tag = "WebUIXWebviewInterfaceWrapper"
 
-    val state get() = run {
-        if (this@WebViewInterface.context !is WebUIActivity) return@run null
-        val webUIActivity = this@WebViewInterface.context as WebUIActivity
-        webUIActivity.webUIState
-    }
-    val modDir get() = "/data/adb/modules/${modId.id}"
-
-    companion object {
-        fun factory() = JavaScriptInterface(WebViewInterface::class.java)
+    @JavascriptInterface
+    fun mmrl(): Boolean {
+        return true
     }
 
     @JavascriptInterface
-    fun exec(cmd: String): String {
+    fun execBool(cmd: String): Boolean {
+        return withNewRootShell { ShellUtils.fastCmdResult(this, cmd) }
+    }
+}
+
+class WebUIXWebViewInterfaceImpl(
+    webView: WebView?,
+    modId: String,
+    private val activity: Activity?
+) : AbstractWebViewInterface(webView, "/data/adb/modules/$modId") {
+    @JavascriptInterface
+    override fun enableEdgeToEdge(enable: Boolean) {
+        // not support
+    }
+
+    @JavascriptInterface
+    override fun exit() {
+        activity?.finish()
+    }
+}
+
+class KSUWebUIWebViewInterfaceImpl(
+    private val state: WebUIState,
+) : AbstractWebViewInterface(state.webView, state.modDir) {
+    @JavascriptInterface
+    override fun enableEdgeToEdge(enable: Boolean) {
+        state.isInsetsEnabled = enable
+    }
+
+    @JavascriptInterface
+    override fun exit() {
+        state.requestExit()
+    }
+}
+
+abstract class AbstractWebViewInterface(
+    private val webView: WebView?,
+    private val modDir: String,
+) : WebViewInterface {
+    @JavascriptInterface
+    override fun exec(cmd: String): String {
         return withNewRootShell(true) { ShellUtils.fastCmd(this, cmd) }
     }
 
     @JavascriptInterface
-    fun exec(cmd: String, callbackFunc: String) {
+    override fun exec(cmd: String, callbackFunc: String) {
         exec(cmd, null, callbackFunc)
     }
 
@@ -73,7 +109,7 @@ class WebViewInterface(
     }
 
     @JavascriptInterface
-    fun exec(
+    override fun exec(
         cmd: String,
         options: String?,
         callbackFunc: String
@@ -94,13 +130,13 @@ class WebViewInterface(
                     stdout
                 )
             }, ${JSONObject.quote(stderr)}); } catch(e) { console.error(e); } })();"
-        webView.post {
+        webView?.post {
             webView.loadUrl(jsCode)
         }
     }
 
     @JavascriptInterface
-    fun spawn(command: String, args: String, options: String?, callbackFunc: String) {
+    override fun spawn(command: String, args: String, options: String?, callbackFunc: String) {
         val finalCommand = StringBuilder()
 
         processOptions(finalCommand, options)
@@ -126,7 +162,7 @@ class WebViewInterface(
                         data
                     )
                 }); } catch(e) { console.error('emitData', e); } })();"
-            webView.post {
+            webView?.post {
                 webView.loadUrl(jsCode)
             }
         }
@@ -151,7 +187,7 @@ class WebViewInterface(
         completableFuture.thenAccept { result ->
             val emitExitCode =
                 "javascript: (function() { try { ${callbackFunc}.emit('exit', ${result.code}); } catch(e) { console.error(`emitExit error: \${e}`); } })();"
-            webView.post {
+            webView?.post {
                 webView.loadUrl(emitExitCode)
             }
 
@@ -164,7 +200,7 @@ class WebViewInterface(
                             )
                         )
                     };${callbackFunc}.emit('error', err); } catch(e) { console.error('emitErr', e); } })();"
-                webView.post {
+                webView?.post {
                     webView.loadUrl(emitErrCode)
                 }
             }
@@ -174,15 +210,15 @@ class WebViewInterface(
     }
 
     @JavascriptInterface
-    fun toast(msg: String) {
-        webView.post {
+    override fun toast(msg: String) {
+        webView?.post {
             Toast.makeText(webView.context, msg, Toast.LENGTH_SHORT).show()
         }
     }
 
     @JavascriptInterface
-    fun fullScreen(enable: Boolean) {
-        val context = webView.context
+    override fun fullScreen(enable: Boolean) {
+        val context = webView?.context
         if (context is Activity) {
             Handler(Looper.getMainLooper()).post {
                 if (enable) {
@@ -196,17 +232,12 @@ class WebViewInterface(
     }
 
     @JavascriptInterface
-    fun enableInsets(enable: Boolean = true) {
+    override fun enableInsets(enable: Boolean) {
         enableEdgeToEdge(enable)
     }
 
     @JavascriptInterface
-    fun enableEdgeToEdge(enable: Boolean = true) {
-        state?.isInsetsEnabled = enable
-    }
-
-    @JavascriptInterface
-    fun moduleInfo(): String {
+    override fun moduleInfo(): String {
         val moduleInfos = JSONArray(listModules())
         val currentModuleInfo = JSONObject()
         currentModuleInfo.put("moduleDir", modDir)
@@ -228,7 +259,7 @@ class WebViewInterface(
     }
 
     @JavascriptInterface
-    fun listPackages(type: String): String {
+    override fun listPackages(type: String): String {
         val packageNames = SuperUserViewModel.apps
             .filter { appInfo ->
                 val flags = appInfo.packageInfo.applicationInfo?.flags ?: 0
@@ -249,7 +280,7 @@ class WebViewInterface(
     }
 
     @JavascriptInterface
-    fun getPackagesInfo(packageNamesJson: String): String {
+    override fun getPackagesInfo(packageNamesJson: String): String {
         val packageNames = JSONArray(packageNamesJson)
         val jsonArray = JSONArray()
         val appMap = SuperUserViewModel.apps.associateBy { it.packageName }
@@ -278,21 +309,12 @@ class WebViewInterface(
     }
 
     @JavascriptInterface
-    fun exit() {
-        if (state != null) {
-            state?.requestExit()
-        } else {
-            activity.finish() // in webuix mode, we directly exit activity
-        }
-    }
-
-    @JavascriptInterface
-    fun listAllKpm(): String {
+    override fun listAllKpm(): String {
         return listKpmModules()
     }
 
     @JavascriptInterface
-    fun controlKpm(name: String, args: String): Int {
+    override fun controlKpm(name: String, args: String): Int {
         return controlKpmModule(name, args)
     }
 }
@@ -305,3 +327,47 @@ fun hideSystemUI(window: Window) =
 
 fun showSystemUI(window: Window) =
     WindowInsetsControllerCompat(window, window.decorView).show(WindowInsetsCompat.Type.systemBars())
+
+interface WebViewInterface {
+    @JavascriptInterface
+    fun exec(cmd: String): String
+
+    @JavascriptInterface
+    fun exec(cmd: String, callbackFunc: String)
+
+    @JavascriptInterface
+    fun exec(cmd: String, options: String?, callbackFunc: String)
+
+    @JavascriptInterface
+    fun spawn(command: String, args: String, options: String?, callbackFunc: String)
+
+    @JavascriptInterface
+    fun toast(msg: String)
+
+    @JavascriptInterface
+    fun fullScreen(enable: Boolean)
+
+    @JavascriptInterface
+    fun enableInsets(enable: Boolean = true)
+
+    @JavascriptInterface
+    fun enableEdgeToEdge(enable: Boolean = true)
+
+    @JavascriptInterface
+    fun moduleInfo(): String
+
+    @JavascriptInterface
+    fun listPackages(type: String): String
+
+    @JavascriptInterface
+    fun getPackagesInfo(packageNamesJson: String): String
+
+    @JavascriptInterface
+    fun exit()
+
+    @JavascriptInterface
+    fun listAllKpm(): String
+
+    @JavascriptInterface
+    fun controlKpm(name: String, args: String): Int
+}

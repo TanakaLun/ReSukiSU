@@ -1,64 +1,46 @@
 package com.resukisu.resukisu.ui.webui
 
-import android.app.ActivityManager
-import android.os.Build
-import android.os.Bundle
+import android.annotation.SuppressLint
+import android.graphics.Bitmap
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.widget.Toast
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.lifecycle.lifecycleScope
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.dergoogler.mmrl.platform.Platform
 import com.dergoogler.mmrl.platform.model.ModId
-import com.dergoogler.mmrl.ui.component.Loading
-import com.dergoogler.mmrl.webui.model.WebUIConfig
-import com.dergoogler.mmrl.webui.screen.WebUIScreen
-import com.dergoogler.mmrl.webui.util.rememberWebUIOptions
+import com.dergoogler.mmrl.webui.activity.WXActivity
+import com.dergoogler.mmrl.webui.client.WXClient
+import com.dergoogler.mmrl.webui.util.WebUIOptions
+import com.dergoogler.mmrl.webui.view.WebUIXView
 import com.resukisu.resukisu.BuildConfig
 import com.resukisu.resukisu.R
 import com.resukisu.resukisu.ksuApp
 import com.resukisu.resukisu.ui.theme.KernelSUTheme
 import com.resukisu.resukisu.ui.viewmodel.ModuleViewModel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import com.resukisu.resukisu.ui.viewmodel.SuperUserViewModel
+import kotlinx.coroutines.CoroutineScope
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 
-class WebUIXActivity : ComponentActivity() {
-    private lateinit var webView: WebView
+class WebUIXActivity : WXActivity() {
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-
-        webView = WebView(this)
-
-        lifecycleScope.launch {
-            initPlatform()
-        }
-
+    @OptIn(ExperimentalMaterial3ExpressiveApi::class)
+    override suspend fun onRender(scope: CoroutineScope) {
         val moduleId = intent.getStringExtra("id")!!
-        val name = intent.getStringExtra("name")!!
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            @Suppress("DEPRECATION")
-            setTaskDescription(ActivityManager.TaskDescription("ReSukiSU - $name"))
-        } else {
-            val taskDescription =
-                ActivityManager.TaskDescription.Builder().setLabel("ReSukiSU - $name").build()
-            setTaskDescription(taskDescription)
-        }
-
-        val prefs = getSharedPreferences("settings", MODE_PRIVATE)
 
         setContent {
             KernelSUTheme {
-                var isLoading by remember { mutableStateOf(true) }
                 val moduleViewModel = viewModel<ModuleViewModel>(
                     viewModelStoreOwner = ksuApp
                 )
@@ -86,47 +68,113 @@ class WebUIXActivity : ComponentActivity() {
                     }
                 }
 
-                LaunchedEffect(Platform.isAlive) {
-                    while (!Platform.isAlive) {
-                        delay(1000)
-                    }
-
-                    isLoading = false
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    LoadingIndicator()
                 }
+            }
+        }
 
-                if (isLoading) {
-                    Loading()
-                    return@KernelSUTheme
-                }
+        initPlatform(this)
+        super.onRender(scope)
 
+        init()
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun init() {
+        val moduleId = intent.getStringExtra("id")!!
+
+        val prefs = getSharedPreferences("settings", MODE_PRIVATE)
+
+        setContent {
+            KernelSUTheme {
                 val webDebugging = prefs.getBoolean("enable_web_debugging", false)
                 val erudaInject = prefs.getBoolean("use_webuix_eruda", false)
                 val dark = isSystemInDarkTheme()
+                val colorScheme = MaterialTheme.colorScheme
 
-                val options = rememberWebUIOptions(
-                    modId = ModId(moduleId),
-                    debug = webDebugging,
-                    appVersionCode = BuildConfig.VERSION_CODE,
-                    isDarkMode = dark,
-                    enableEruda = erudaInject,
-                    cls = WebUIXActivity::class.java,
-                    userAgentString = ksuApp.UserAgent
+                LaunchedEffect(Unit) {
+                    if (SuperUserViewModel.apps.isEmpty()) {
+                        SuperUserViewModel().fetchAppList()
+                    }
+                }
+
+                AndroidView(
+                    factory = { context ->
+                        val options = WebUIOptions(
+                            context = context,
+                            modId = ModId(moduleId),
+                            debug = webDebugging,
+                            appVersionCode = BuildConfig.VERSION_CODE,
+                            isDarkMode = dark,
+                            enableEruda = erudaInject,
+                            cls = WebUIXActivity::class.java,
+                            userAgentString = ksuApp.UserAgent,
+                            colorScheme = colorScheme,
+                            disableGlobalExitConfirm = true,
+                            client = { options, insets, assetHandlers ->
+                                object : WXClient(options, insets, assetHandlers) {
+                                    override fun shouldInterceptRequest(
+                                        view: WebView?,
+                                        request: WebResourceRequest
+                                    ): WebResourceResponse? {
+                                        val url = request.url
+                                        if (url.scheme.equals(
+                                                "ksu",
+                                                ignoreCase = true
+                                            ) && url.host.equals("icon", ignoreCase = true)
+                                        ) {
+                                            val packageName = url.path?.substring(1)
+                                            if (!packageName.isNullOrEmpty()) {
+                                                val icon = AppIconUtil.loadAppIconSync(
+                                                    context,
+                                                    packageName,
+                                                    512
+                                                )
+                                                if (icon != null) {
+                                                    val stream = ByteArrayOutputStream()
+                                                    icon.compress(
+                                                        Bitmap.CompressFormat.PNG,
+                                                        100,
+                                                        stream
+                                                    )
+                                                    return WebResourceResponse(
+                                                        "image/png", null,
+                                                        ByteArrayInputStream(stream.toByteArray())
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        return super.shouldInterceptRequest(view, request)
+                                    }
+                                }
+                            },
+                        )
+
+                        WebUIXView(options).apply {
+                            wx.addJavascriptInterface<WebUIXWebviewInterfaceWrapper>(
+                                initargs = arrayOf(
+                                    WebUIXWebViewInterfaceImpl(
+                                        wx, moduleId, this@WebUIXActivity
+                                    )
+                                ),
+                                parameterTypes = arrayOf(
+                                    WebUIXWebViewInterfaceImpl::class.java
+                                )
+                            )
+                            view = this
+                        }
+                    }
                 )
 
-                // idk why webuix not allow root impl change webuiConfig
-                // so we use magic to force exitConfirm shutdown
-                val field = WebUIConfig::class.java.getDeclaredField("exitConfirm")
-                field.isAccessible = true
-                field.set(options.config, false)
-                field.isAccessible = false
-
-                WebUIScreen(
-                    webView = webView,
-                    options = options,
-                    interfaces = listOf(
-                        WebViewInterface.factory()
-                    )
-                )
+                config {
+                    if (title != null) {
+                        setActivityTitle("ReSukiSU - $title")
+                    }
+                }
             }
         }
     }

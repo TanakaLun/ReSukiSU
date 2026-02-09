@@ -79,7 +79,6 @@ import com.resukisu.resukisu.ui.viewmodel.HomeViewModel
 import com.resukisu.resukisu.ui.viewmodel.SuperUserViewModel
 import com.resukisu.resukisu.ui.webui.WebUIActivity
 import com.resukisu.resukisu.ui.webui.WebUIXActivity
-import com.resukisu.resukisu.ui.webui.initPlatform
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.Job
@@ -202,10 +201,6 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         }
-                    }
-
-                    LaunchedEffect(Unit) {
-                        initPlatform()
                     }
 
                     ShortcutIntentHandler(

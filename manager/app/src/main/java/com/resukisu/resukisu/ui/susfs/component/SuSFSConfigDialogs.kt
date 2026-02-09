@@ -1280,7 +1280,10 @@ fun FeatureStatusCard(
                     }
                 ) {
                     Text(
-                        text = feature.statusText,
+                        text = if (feature.isEnabled)
+                            stringResource(R.string.susfs_feature_enabled)
+                        else
+                            stringResource(R.string.susfs_feature_disabled),
                         style = MaterialTheme.typography.labelLarge,
                         color = when {
                             feature.isEnabled -> MaterialTheme.colorScheme.onPrimary

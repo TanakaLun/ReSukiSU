@@ -93,6 +93,8 @@ android {
             excludes += "DebugProbesKt.bin"
             // https://issueantenna.com/repo/kotlin/kotlinx.coroutines/issues/3158
             excludes += "kotlin-tooling-metadata.json"
+            // it will cause build failed
+            excludes += "META-INF/gradle/incremental.annotation.processors"
         }
     }
 
@@ -209,9 +211,10 @@ dependencies {
     implementation(libs.com.github.topjohnwu.libsu.core)
 
     implementation(libs.mmrl.platform)
-    compileOnly(libs.mmrl.hidden.api)
-    implementation(libs.mmrl.webui)
     implementation(libs.mmrl.ui)
+    implementation(libs.androidx.swiperefreshlayout)
+    implementation(libs.webuix.portable)
+    implementation(libs.webuix.helper)
 
     implementation(libs.accompanist.drawablepainter)
 
