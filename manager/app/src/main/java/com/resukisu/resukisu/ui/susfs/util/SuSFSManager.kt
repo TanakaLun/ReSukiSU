@@ -877,6 +877,12 @@ object SuSFSManager {
         return featureMap.map { (configKey, displayName) ->
             val isEnabled = enabledConfigs.contains(configKey)
 
+            if (isEnabled) {
+                context.getString(R.string.susfs_feature_enabled)
+            } else {
+                context.getString(R.string.susfs_feature_disabled)
+            }
+
             val canConfigure = displayName == context.getString(R.string.enable_log_feature_label)
 
             EnabledFeature(displayName, isEnabled, canConfigure)
