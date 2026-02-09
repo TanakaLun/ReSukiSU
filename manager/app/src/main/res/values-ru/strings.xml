@@ -296,8 +296,6 @@
     <string name="dpi_apply_settings">Применить настройки DPI</string>
     <string name="dpi_confirm_title">Подтвердите изменение DPI</string>
     <string name="dpi_confirm_message">Вы уверены, что хотите изменить DPI приложения с %1$d на %2$d?</string>
-    <string name="dpi_confirm_summary">Приложение нужно перезапустить, чтобы применить новые настройки DPI. Это не влияет на системную строку состояния или другие приложения</string>
-    <string name="dpi_applied_success">DPI был установлен в %1$d, действующий после перезапуска приложения</string>
     <!-- Language settings related strings -->
     <string name="settings_language">Язык приложения</string>
     <string name="language_system_default">Как в системе</string>

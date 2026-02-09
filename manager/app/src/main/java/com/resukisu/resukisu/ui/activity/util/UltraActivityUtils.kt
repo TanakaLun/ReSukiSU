@@ -1,45 +1,23 @@
 package com.resukisu.resukisu.ui.activity.util
 
 import android.content.Context
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.runtime.Composable
+import android.net.Uri
+import androidx.core.content.edit
+import androidx.lifecycle.lifecycleScope
+import com.ramcosta.composedestinations.generated.destinations.FlashScreenDestination
+import com.ramcosta.composedestinations.generated.destinations.InstallScreenDestination
+import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import com.resukisu.resukisu.Natives
 import com.resukisu.resukisu.ui.MainActivity
-import com.resukisu.resukisu.ui.util.*
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import java.util.*
-import android.net.Uri
-import androidx.lifecycle.lifecycleScope
-import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import com.resukisu.resukisu.ui.component.ZipFileDetector
 import com.resukisu.resukisu.ui.component.ZipFileInfo
 import com.resukisu.resukisu.ui.component.ZipType
-import com.ramcosta.composedestinations.generated.destinations.FlashScreenDestination
-import com.ramcosta.composedestinations.generated.destinations.InstallScreenDestination
 import com.resukisu.resukisu.ui.screen.FlashIt
+import com.resukisu.resukisu.ui.util.getKpmVersion
+import com.resukisu.resukisu.ui.util.rootAvailable
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import androidx.core.content.edit
-
-object AnimatedBottomBar {
-    @Composable
-    fun AnimatedBottomBarWrapper(
-        showBottomBar: Boolean,
-        content: @Composable () -> Unit
-    ) {
-        AnimatedVisibility(
-            visible = showBottomBar,
-            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
-        ) {
-            content()
-        }
-    }
-}
 
 object UltraActivityUtils {
 
@@ -113,25 +91,5 @@ object AppData {
     fun isFullFeatured(): Boolean {
         val isManager = Natives.isManager
         return isManager && !Natives.requireNewKernel() && rootAvailable()
-    }
-}
-
-object DisplayUtils {
-    fun applyCustomDpi(context: Context) {
-        val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
-        val customDpi = prefs.getInt("app_dpi", 0)
-
-        if (customDpi > 0) {
-            try {
-                val resources = context.resources
-                val metrics = resources.displayMetrics
-                metrics.density = customDpi / 160f
-                @Suppress("DEPRECATION")
-                metrics.scaledDensity = customDpi / 160f
-                metrics.densityDpi = customDpi
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
     }
 }

@@ -293,8 +293,6 @@
     <string name="dpi_apply_settings">Застосування налаштувань DPI</string>
     <string name="dpi_confirm_title">Підтвердити зміну DPI</string>
     <string name="dpi_confirm_message">Ви впевнені, що хочете змінити DPI додатку з %1$d на %2$d?</string>
-    <string name="dpi_confirm_summary">Додаток потрібно перезапустити, щоб застосувати нові налаштування DPI; це не вплине на системний рядок стану або інші додатки</string>
-    <string name="dpi_applied_success">DPI встановлено на %1$d, набуде чинності після перезапуску додатку</string>
     <!-- Language settings related strings -->
     <string name="settings_language">Мова додатку</string>
     <string name="language_system_default">Як у системі</string>

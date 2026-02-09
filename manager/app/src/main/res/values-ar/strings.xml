@@ -288,8 +288,6 @@
     <string name="dpi_apply_settings">تطبيق إعدادات DPI</string>
     <string name="dpi_confirm_title">تأكيد تغيير إدارة شؤون الإعلام</string>
     <string name="dpi_confirm_message">هل أنت متأكد من أنك تريد تغيير تطبيق DPI من %1$d إلى %2$d؟</string>
-    <string name="dpi_confirm_summary">يحتاج التطبيق إلى إعادة تشغيل لتطبيق الإعدادات الجديدة لإدارة شؤون الإعلام، ولا يؤثر على شريط حالة النظام أو التطبيقات الأخرى</string>
-    <string name="dpi_applied_success">تم تعيين DPI إلى %1$d، فعلي بعد إعادة تشغيل التطبيق</string>
     <!-- Language settings related strings -->
     <string name="settings_language">لغة التطبيق</string>
     <string name="language_system_default">اتبع النظام</string>

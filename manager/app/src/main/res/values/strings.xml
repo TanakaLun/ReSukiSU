@@ -332,8 +332,7 @@
     <string name="dpi_apply_settings">Apply DPI settings</string>
     <string name="dpi_confirm_title">Confirm DPI change</string>
     <string name="dpi_confirm_message">Are you sure you want to change the application DPI from %1$d to %2$d?</string>
-    <string name="dpi_confirm_summary">Application needs to be restarted to apply the new DPI settings, does not affect the system status bar or other applications</string>
-    <string name="dpi_applied_success">DPI has been set to %1$d, effective after restarting the application</string>
+    <string name="dpi_applied_success">DPI has been set to %1$d</string>
     <!-- Language settings related strings -->
     <string name="settings_language">App Language</string>
     <string name="language_system_default">Follow System</string>

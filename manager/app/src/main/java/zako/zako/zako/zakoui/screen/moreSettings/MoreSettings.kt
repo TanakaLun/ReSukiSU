@@ -82,7 +82,9 @@ import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import com.resukisu.resukisu.Natives
 import com.resukisu.resukisu.R
 import com.resukisu.resukisu.ui.MainActivity
+import com.resukisu.resukisu.ui.component.ConfirmResult
 import com.resukisu.resukisu.ui.component.ksuIsValid
+import com.resukisu.resukisu.ui.component.rememberConfirmDialog
 import com.resukisu.resukisu.ui.component.settings.AppBackButton
 import com.resukisu.resukisu.ui.component.settings.SettingsBaseWidget
 import com.resukisu.resukisu.ui.component.settings.SettingsDropdownWidget
@@ -350,7 +352,7 @@ private fun AppearanceSettings(
 
         item {
             // DPI 设置
-            DpiSettings(state = state, handlers = handlers)
+            DpiSettings(state = state, handlers = handlers, coroutineScope = coroutineScope)
         }
 
         item {
@@ -599,7 +601,8 @@ private fun ThemeColorSelection(state: MoreSettingsState) {
 @Composable
 private fun DpiSettings(
     state: MoreSettingsState,
-    handlers: MoreSettingsHandlers
+    handlers: MoreSettingsHandlers,
+    coroutineScope: CoroutineScope
 ) {
     SettingsBaseWidget(
         icon = Icons.Default.FormatSize,
@@ -615,14 +618,22 @@ private fun DpiSettings(
     }
 
     // DPI 滑动条和控制
-    DpiSliderControls(state = state, handlers = handlers)
+    DpiSliderControls(state = state, handlers = handlers, coroutineScope = coroutineScope)
 }
 
 @Composable
 private fun DpiSliderControls(
     state: MoreSettingsState,
-    handlers: MoreSettingsHandlers
+    handlers: MoreSettingsHandlers,
+    coroutineScope: CoroutineScope
 ) {
+    val confirmDialog = rememberConfirmDialog()
+    val dpiConfirmTitle = stringResource(R.string.dpi_confirm_title)
+    val dpiConfirmMessage =
+        stringResource(R.string.dpi_confirm_message, state.currentDpi, state.tempDpi)
+    val confirmText = stringResource(R.string.confirm)
+    val cancelText = stringResource(R.string.cancel)
+
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         val sliderValue by animateFloatAsState(
             targetValue = state.tempDpi.toFloat(),
@@ -694,7 +705,20 @@ private fun DpiSliderControls(
         )
 
         Button(
-            onClick = { state.showDpiConfirmDialog = true },
+            onClick = {
+                coroutineScope.launch {
+                    val confirmResult = confirmDialog.awaitConfirm(
+                        title = dpiConfirmTitle,
+                        content = dpiConfirmMessage,
+                        confirm = confirmText,
+                        dismiss = cancelText
+                    )
+
+                    if (confirmResult != ConfirmResult.Confirmed) return@launch
+
+                    handlers.handleDpiApply()
+                }
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 8.dp),

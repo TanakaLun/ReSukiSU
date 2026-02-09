@@ -286,8 +286,6 @@
     <string name="dpi_apply_settings">Aplicando configurações de DPI</string>
     <string name="dpi_confirm_title">Confirmar alteração de DPI</string>
     <string name="dpi_confirm_message">Tem certeza que deseja alterar o DPI do aplicativo do %1$d para %2$d?</string>
-    <string name="dpi_confirm_summary">O aplicativo precisa ser reiniciado para aplicar as novas configurações DPI, não afeta a barra de status do sistema ou outras aplicações</string>
-    <string name="dpi_applied_success">DPI foi definido para %1$d, efetivo após reiniciar o aplicativo</string>
     <!-- Language settings related strings -->
     <string name="settings_language">Língua do aplicativo</string>
     <string name="language_system_default">Padrão do sistema</string>

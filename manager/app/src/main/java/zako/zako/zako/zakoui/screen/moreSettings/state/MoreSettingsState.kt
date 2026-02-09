@@ -41,7 +41,6 @@ class MoreSettingsState(
 
     // 对话框显示状态
     var showThemeColorDialog by mutableStateOf(false)
-    var showDpiConfirmDialog by mutableStateOf(false)
 
     // 动态管理器配置状态
     var dynamicSignConfig by mutableStateOf<Natives.DynamicManagerConfig?>(null)

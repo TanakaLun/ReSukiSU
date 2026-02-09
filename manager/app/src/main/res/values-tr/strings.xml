@@ -305,8 +305,6 @@
     <string name="dpi_apply_settings">DPI ayarlarını uygula</string>
     <string name="dpi_confirm_title">DPI değişikliğini onayla</string>
     <string name="dpi_confirm_message">Uygulama DPI\'sini %1$d\'den %2$d\'ye değiştirmek istediğinizden emin misiniz?</string>
-    <string name="dpi_confirm_summary">Yeni DPI ayarlarını uygulamak için uygulamanın yeniden başlatılması gerekir, sistem durum çubuğunu veya diğer uygulamaları etkilemez</string>
-    <string name="dpi_applied_success">DPI %1$d olarak ayarlandı, uygulama yeniden başlatıldıktan sonra geçerli olur</string>
     <!-- Language settings related strings -->
     <string name="settings_language">Uygulama Dili</string>
     <string name="language_system_default">Sistemi takip et</string>

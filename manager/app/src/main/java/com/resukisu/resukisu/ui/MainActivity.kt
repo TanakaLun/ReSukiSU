@@ -42,6 +42,8 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
@@ -60,7 +62,6 @@ import com.ramcosta.composedestinations.spec.NavHostGraphSpec
 import com.ramcosta.composedestinations.utils.rememberDestinationsNavigator
 import com.resukisu.resukisu.Natives
 import com.resukisu.resukisu.ui.activity.component.NavigationBar
-import com.resukisu.resukisu.ui.activity.util.DisplayUtils
 import com.resukisu.resukisu.ui.activity.util.ThemeChangeContentObserver
 import com.resukisu.resukisu.ui.activity.util.ThemeUtils
 import com.resukisu.resukisu.ui.activity.util.UltraActivityUtils
@@ -93,7 +94,8 @@ class MainActivity : ComponentActivity() {
 
     data class SettingsState(
         val isHideOtherInfo: Boolean = false,
-        val showKpmInfo: Boolean = false
+        val showKpmInfo: Boolean = false,
+        val dpi: Int = 0
     )
 
     private var showConfirmationDialog = mutableStateOf(false)
@@ -110,8 +112,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         try {
-            // 应用自定义 DPI
-            DisplayUtils.applyCustomDpi(this)
 
             // Enable edge to edge
             enableEdgeToEdge()
@@ -212,9 +212,23 @@ class MainActivity : ComponentActivity() {
                         intentState = intentState,
                         navigator = navigator
                     )
+                    val settings by settingsStateFlow.collectAsState()
+                    val systemDensity = LocalDensity.current
+
+                    val density = remember(systemDensity, settings.dpi) {
+                        if (settings.dpi <= 0f) {
+                            systemDensity
+                        } else {
+                            // 直接计算自定义 DPI 占 160 (标准 MDPI) 的比例
+                            // 公式：Density = TargetDPI / 160
+                            val targetDensity = settings.dpi / 160f
+                            Density(density = targetDensity, fontScale = systemDensity.fontScale)
+                        }
+                    }
 
                     CompositionLocalProvider(
                         LocalSnackbarHost provides snackBarHostState,
+                        LocalDensity provides density
                     ) {
                         DestinationsNavHost(
                             navGraph = NavGraphs.root as NavHostGraphSpec,

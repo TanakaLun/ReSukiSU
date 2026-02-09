@@ -1,7 +1,6 @@
 package zako.zako.zako.zakoui.screen.moreSettings
 
 import android.content.Context
-import android.content.Intent
 import android.content.SharedPreferences
 import android.content.res.Configuration
 import android.net.Uri
@@ -184,11 +183,9 @@ class MoreSettingsHandlers(
                 Toast.LENGTH_SHORT
             ).show()
 
-            val restartIntent = activity.packageManager.getLaunchIntentForPackage(activity.packageName)
-            restartIntent?.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK)
-            activity.startActivity(restartIntent)
-
-            state.showDpiConfirmDialog = false
+            activity.settingsStateFlow.value = activity.settingsStateFlow.value.copy(
+                dpi = state.tempDpi
+            )
         }
     }
 

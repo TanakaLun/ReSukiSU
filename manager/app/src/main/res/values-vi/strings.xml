@@ -305,8 +305,6 @@
     <string name="dpi_apply_settings">Áp dụng</string>
     <string name="dpi_confirm_title">Xác nhận thay đổi DPI</string>
     <string name="dpi_confirm_message">Bạn có chắc chắn muốn thay đổi DPI của ứng dụng từ %1$d thành %2$d?</string>
-    <string name="dpi_confirm_summary">Ứng dụng cần được khởi động lại để áp dụng cài đặt DPI mới, không ảnh hưởng đến thanh trạng thái hệ thống hoặc các ứng dụng khác</string>
-    <string name="dpi_applied_success">DPI đã được đặt thành %1$d, có hiệu lực sau khi khởi động lại ứng dụng</string>
     <!-- Language settings related strings -->
     <string name="settings_language">Ngôn ngữ ứng dụng</string>
     <string name="language_system_default">Mặc định theo hệ thống</string>

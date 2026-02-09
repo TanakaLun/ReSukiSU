@@ -294,8 +294,7 @@ Tanamkan: Secara permanen memasang ke sistem</string>
     <string name="dpi_apply_settings">Menerapkan Pengaturan DPI</string>
     <string name="dpi_confirm_title">Konfirmasi Perubahan DPI</string>
     <string name="dpi_confirm_message">Apakah Anda yakin ingin mengubah DPI aplikasi dari %1$d menjadi %2$d?</string>
-    <string name="dpi_confirm_summary">Aplikasi perlu dijalankan ulang agar pengaturan DPI baru diterapkan; ini tidak akan mempengaruhi bilah status sistem atau aplikasi lainnya</string>
-    <string name="dpi_applied_success">DPI diatur ke %1$d, akan diterapkan setelah aplikasi dijalankan ulang</string>
+    <string name="dpi_applied_success">DPI diatur ke %1$d</string>
     <!-- Language settings related strings -->
     <string name="settings_language">Bahasa Aplikasi</string>
     <string name="language_system_default">Ikuti Sistem</string>

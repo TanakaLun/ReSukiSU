@@ -296,8 +296,6 @@
     <string name="dpi_apply_settings">DPI の設定を適用する</string>
     <string name="dpi_confirm_title">DPI の変更を確認</string>
     <string name="dpi_confirm_message">アプリの DPI を %1$d から %2$d に変更してもよろしいですか？</string>
-    <string name="dpi_confirm_summary">変更した DPI 設定を適用するにはアプリを再起動する必要がありますが、システムステータスバーや他のアプリには影響しません</string>
-    <string name="dpi_applied_success">DPI は %1$d に変更されました。アプリの再起動後に適用されます。</string>
     <!-- Language settings related strings -->
     <string name="settings_language">アプリの言語</string>
     <string name="language_system_default">システムに従う</string>

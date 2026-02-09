@@ -295,8 +295,6 @@
     <string name="dpi_apply_settings">Terapkan setelan DPI</string>
     <string name="dpi_confirm_title">Konfirmasi perubahan DPI</string>
     <string name="dpi_confirm_message">Apa kamu yakin ingin merubah DPI aplikasi dari %1$d ke %2$d?</string>
-    <string name="dpi_confirm_summary">Aplikasi membutuhkan restar untuk menerapkan opsi DPI ini, perubahan ini tidak mengganggu DPI sistem</string>
-    <string name="dpi_applied_success">DPI telah di rubah ke %1$d, efektif setelah aplikasi di restar</string>
     <!-- Language settings related strings -->
     <string name="settings_language">Bahasa Aplikasi</string>
     <string name="language_system_default">Mengikuti sistem</string>

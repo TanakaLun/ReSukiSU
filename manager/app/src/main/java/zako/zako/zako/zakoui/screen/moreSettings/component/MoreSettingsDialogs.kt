@@ -22,7 +22,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -56,22 +55,6 @@ fun MoreSettingsDialogs(
     state: MoreSettingsState,
     handlers: MoreSettingsHandlers
 ) {
-    // DPI 设置确认对话框
-    if (state.showDpiConfirmDialog) {
-        ConfirmDialog(
-            title = stringResource(R.string.dpi_confirm_title),
-            message = stringResource(R.string.dpi_confirm_message, state.currentDpi, state.tempDpi),
-            summaryText = stringResource(R.string.dpi_confirm_summary),
-            confirmText = stringResource(R.string.confirm),
-            dismissText = stringResource(R.string.cancel),
-            onConfirm = { handlers.handleDpiApply() },
-            onDismiss = {
-                state.showDpiConfirmDialog = false
-                state.tempDpi = state.currentDpi
-            }
-        )
-    }
-
     // 主题色选择对话框
     if (state.showThemeColorDialog) {
         ThemeColorDialog(
@@ -94,86 +77,6 @@ fun MoreSettingsDialogs(
             onDismiss = { state.showDynamicSignDialog = false }
         )
     }
-}
-
-@Composable
-fun SingleChoiceDialog(
-    title: String,
-    options: List<String>,
-    selectedIndex: Int,
-    onOptionSelected: (Int) -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                options.forEachIndexed { index, option ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                onOptionSelected(index)
-                                onDismiss()
-                            }
-                            .padding(vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(
-                            selected = selectedIndex == index,
-                            onClick = null
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(option)
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel))
-            }
-        }
-    )
-}
-
-@Composable
-fun ConfirmDialog(
-    title: String,
-    message: String,
-    summaryText: String? = null,
-    confirmText: String = stringResource(R.string.confirm),
-    dismissText: String = stringResource(R.string.cancel),
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            Column {
-                Text(message)
-                if (summaryText != null) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        summaryText,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(confirmText)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(dismissText)
-            }
-        }
-    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

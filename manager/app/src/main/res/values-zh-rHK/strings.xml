@@ -293,8 +293,7 @@
     <string name="dpi_apply_settings">應用 DPI 配置</string>
     <string name="dpi_confirm_title">確認更改 DPI</string>
     <string name="dpi_confirm_message">您確定要將應用 DPI 從 %1$d 更改為 %2$d 嗎？</string>
-    <string name="dpi_confirm_summary">應用需要重新啟動以應用新嘅 DPI 配置，唔會影響系統狀態欄或其他應用</string>
-    <string name="dpi_applied_success">DPI 已設定為 %1$d，重新啟動應用後生效</string>
+    <string name="dpi_applied_success">DPI 已設定為 %1$d</string>
     <!-- Language settings related strings -->
     <string name="settings_language">應用語言</string>
     <string name="language_system_default">跟隨系統</string>

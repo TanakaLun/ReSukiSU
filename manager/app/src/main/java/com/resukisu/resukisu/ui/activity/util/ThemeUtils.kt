@@ -28,7 +28,8 @@ object ThemeUtils {
 
         settingsStateFlow.value = MainActivity.SettingsState(
             isHideOtherInfo = prefs.getBoolean("is_hide_other_info", false),
-            showKpmInfo = prefs.getBoolean("show_kpm_info", false)
+            showKpmInfo = prefs.getBoolean("show_kpm_info", false),
+            dpi = prefs.getInt("app_dpi", 0),
         )
 
         if (isFirstRun) {
