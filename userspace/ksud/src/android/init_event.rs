@@ -126,7 +126,7 @@ pub fn on_post_data_fs() -> Result<()> {
     }
 
     // Load umount config and apply to kernel
-    if let Err(e) = crate::android::umount::load_umount_config() {
+    if let Err(e) = crate::android::umount_config::load_umount_config() {
         warn!("load umount config failed: {e}");
     }
 
