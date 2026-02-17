@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -22,9 +23,8 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.BugReport
@@ -94,7 +94,6 @@ import com.resukisu.resukisu.R
 import com.resukisu.resukisu.ui.component.AboutDialog
 import com.resukisu.resukisu.ui.component.ConfirmResult
 import com.resukisu.resukisu.ui.component.DialogHandle
-import com.resukisu.resukisu.ui.component.KsuIsValid
 import com.resukisu.resukisu.ui.component.ksuIsValid
 import com.resukisu.resukisu.ui.component.rememberConfirmDialog
 import com.resukisu.resukisu.ui.component.rememberCustomDialog
@@ -155,227 +154,276 @@ fun SettingsPage(navigator: DestinationsNavigator, bottomPadding: Dp, hazeState:
             AboutDialog(it)
         }
         val loadingDialog = rememberLoadingDialog()
+        var showBottomsheet by remember { mutableStateOf(false) }
+        val logSaved = stringResource(R.string.log_saved)
+        val context = LocalContext.current
+        val scope = rememberCoroutineScope()
+        val exportBugreportLauncher = rememberLauncherForActivityResult(
+            ActivityResultContracts.CreateDocument("application/gzip")
+        ) { uri: Uri? ->
+            if (uri == null) return@rememberLauncherForActivityResult
+            scope.launch(Dispatchers.IO) {
+                loadingDialog.show()
+                context.contentResolver.openOutputStream(uri)?.use { output ->
+                    getBugreportFile(context).inputStream().use {
+                        it.copyTo(output)
+                    }
+                }
+                loadingDialog.hide()
+                snackBarHost.showSnackbar(logSaved)
+            }
+        }
 
-        Column(
+        var isKernelUmountEnabled by rememberSaveable {
+            mutableStateOf(
+                Natives.isKernelUmountEnabled()
+            )
+        }
+
+        LazyColumn(
             modifier =
                 (if (hazeState != null)
                     Modifier.hazeSource(state = hazeState)
                 else Modifier)
-                    .nestedScroll(scrollBehavior.nestedScrollConnection)
-                    .verticalScroll(rememberScrollState())
+                    .nestedScroll(scrollBehavior.nestedScrollConnection),
+            contentPadding = PaddingValues(
+                top = innerPadding.calculateTopPadding() + 5.dp,
+                start = 0.dp,
+                end = 0.dp,
+                bottom = innerPadding.calculateBottomPadding() + bottomPadding + 15.dp
+            )
         ) {
-            val context = LocalContext.current
-            val scope = rememberCoroutineScope()
-            val exportBugreportLauncher = rememberLauncherForActivityResult(
-                ActivityResultContracts.CreateDocument("application/gzip")
-            ) { uri: Uri? ->
-                if (uri == null) return@rememberLauncherForActivityResult
-                scope.launch(Dispatchers.IO) {
-                    loadingDialog.show()
-                    context.contentResolver.openOutputStream(uri)?.use { output ->
-                        getBugreportFile(context).inputStream().use {
-                            it.copyTo(output)
-                        }
-                    }
-                    loadingDialog.hide()
-                    snackBarHost.showSnackbar(context.getString(R.string.log_saved))
-                }
-            }
-
-            Spacer(modifier = Modifier.height(innerPadding.calculateTopPadding()))
-
             // 配置卡片
-            KsuIsValid {
-                val modeItems = listOf(
-                    stringResource(id = R.string.settings_mode_default),
-                    stringResource(id = R.string.settings_mode_disable_until_reboot),
-                    stringResource(id = R.string.settings_mode_disable_always),
-                )
-                SplicedColumnGroup(
-                    title = stringResource(R.string.configuration),
-                    content = {
-                        item {
-                            // 配置文件模板入口
-                            SettingsJumpPageWidget(
-                                icon = Icons.Filled.Fence,
-                                title = stringResource(R.string.settings_profile_template),
-                                description = stringResource(R.string.settings_profile_template_summary),
-                                onClick = {
-                                    navigator.navigate(AppProfileTemplateScreenDestination)
-                                }
-                            )
-                        }
+            if (ksuIsValid()) {
+                item {
+                    val modeItems = listOf(
+                        stringResource(id = R.string.settings_mode_default),
+                        stringResource(id = R.string.settings_mode_disable_until_reboot),
+                        stringResource(id = R.string.settings_mode_disable_always),
+                    )
 
-                        item {
-                            var suCompatMode by rememberSaveable {
-                                mutableIntStateOf(
-                                    run {
-                                        val currentEnabled = Natives.isSuEnabled()
-                                        val savedPersist = prefs.getInt("su_compat_mode", 0)
-                                        if (savedPersist == 2) 2 else if (!currentEnabled) 1 else 0
+                    SplicedColumnGroup(
+                        title = stringResource(R.string.configuration),
+                        content = {
+                            item {
+                                // 配置文件模板入口
+                                SettingsJumpPageWidget(
+                                    icon = Icons.Filled.Fence,
+                                    title = stringResource(R.string.settings_profile_template),
+                                    description = stringResource(R.string.settings_profile_template_summary),
+                                    onClick = {
+                                        navigator.navigate(AppProfileTemplateScreenDestination)
                                     }
                                 )
                             }
-                            var savedSuStatus by rememberSaveable { mutableStateOf("") }
-                            val suStatus by produceState(initialValue = savedSuStatus) {
-                                value = withContext(Dispatchers.IO) {
-                                    savedSuStatus = getFeatureStatus("su_compat")
-                                    return@withContext savedSuStatus
-                                }
-                            }
-                            val suSummary = when (suStatus) {
-                                "unsupported" -> {
-                                    suCompatMode = 0 // fix wrongly display
-                                    stringResource(id = R.string.feature_status_unsupported_summary)
-                                }
 
-                                "managed" -> stringResource(id = R.string.feature_status_managed_summary)
-                                else -> stringResource(id = R.string.settings_sucompat_summary)
-                            }
-                            SettingsDropdownWidget(
-                                icon = Icons.Rounded.RemoveModerator,
-                                title = stringResource(id = R.string.settings_sucompat),
-                                description = suSummary,
-                                items = modeItems,
-                                enabled = suStatus == "supported",
-                                selectedIndex = suCompatMode,
-                                onSelectedIndexChange = { index ->
-                                    when (index) {
-                                        // Default: enable and save to persist
-                                        0 -> if (Natives.setSuEnabled(true)) {
-                                            execKsud("feature save", true)
-                                            prefs.edit { putInt("su_compat_mode", 0) }
-                                            suCompatMode = 0
+                            item {
+                                var suCompatMode by rememberSaveable {
+                                    mutableIntStateOf(
+                                        run {
+                                            val currentEnabled = Natives.isSuEnabled()
+                                            val savedPersist = prefs.getInt("su_compat_mode", 0)
+                                            if (savedPersist == 2) 2 else if (!currentEnabled) 1 else 0
                                         }
+                                    )
+                                }
+                                var savedSuStatus by rememberSaveable { mutableStateOf("") }
+                                val suStatus by produceState(initialValue = savedSuStatus) {
+                                    value = withContext(Dispatchers.IO) {
+                                        savedSuStatus = getFeatureStatus("su_compat")
+                                        return@withContext savedSuStatus
+                                    }
+                                }
+                                val suSummary = when (suStatus) {
+                                    "unsupported" -> {
+                                        suCompatMode = 0 // fix wrongly display
+                                        stringResource(id = R.string.feature_status_unsupported_summary)
+                                    }
 
-                                        // Temporarily disable: save enabled state first, then disable
-                                        1 -> if (Natives.setSuEnabled(true)) {
-                                            execKsud("feature save", true)
-                                            if (Natives.setSuEnabled(false)) {
+                                    "managed" -> stringResource(id = R.string.feature_status_managed_summary)
+                                    else -> stringResource(id = R.string.settings_sucompat_summary)
+                                }
+                                SettingsDropdownWidget(
+                                    icon = Icons.Rounded.RemoveModerator,
+                                    title = stringResource(id = R.string.settings_sucompat),
+                                    description = suSummary,
+                                    items = modeItems,
+                                    enabled = suStatus == "supported",
+                                    selectedIndex = suCompatMode,
+                                    onSelectedIndexChange = { index ->
+                                        when (index) {
+                                            // Default: enable and save to persist
+                                            0 -> if (Natives.setSuEnabled(true)) {
+                                                execKsud("feature save", true)
                                                 prefs.edit { putInt("su_compat_mode", 0) }
-                                                suCompatMode = 1
+                                                suCompatMode = 0
+                                            }
+
+                                            // Temporarily disable: save enabled state first, then disable
+                                            1 -> if (Natives.setSuEnabled(true)) {
+                                                execKsud("feature save", true)
+                                                if (Natives.setSuEnabled(false)) {
+                                                    prefs.edit { putInt("su_compat_mode", 0) }
+                                                    suCompatMode = 1
+                                                }
+                                            }
+
+                                            // Permanently disable: disable and save
+                                            2 -> if (Natives.setSuEnabled(false)) {
+                                                execKsud("feature save", true)
+                                                prefs.edit { putInt("su_compat_mode", 2) }
+                                                suCompatMode = 2
                                             }
                                         }
-
-                                        // Permanently disable: disable and save
-                                        2 -> if (Natives.setSuEnabled(false)) {
-                                            execKsud("feature save", true)
-                                            prefs.edit { putInt("su_compat_mode", 2) }
-                                            suCompatMode = 2
-                                        }
-                                    }
-                                }
-                            )
-                        }
-
-                        item {
-                            var isKernelUmountEnabled by rememberSaveable { mutableStateOf(Natives.isKernelUmountEnabled()) }
-                            var savedUmountStatus by rememberSaveable { mutableStateOf("") }
-                            val umountStatus by produceState(initialValue = savedUmountStatus) {
-                                value = withContext(Dispatchers.IO) {
-                                    savedUmountStatus = getFeatureStatus("kernel_umount")
-                                    return@withContext savedUmountStatus
-                                }
-                            }
-                            val umountSummary = when (umountStatus) {
-                                "unsupported" -> stringResource(id = R.string.feature_status_unsupported_summary)
-                                "managed" -> stringResource(id = R.string.feature_status_managed_summary)
-                                else -> stringResource(id = R.string.settings_kernel_umount_summary)
-                            }
-                            SettingsSwitchWidget(
-                                icon = Icons.Rounded.RemoveCircle,
-                                title = stringResource(id = R.string.settings_kernel_umount),
-                                description = umountSummary,
-                                enabled = umountStatus == "supported",
-                                checked = isKernelUmountEnabled,
-                                onCheckedChange = { checked ->
-                                    if (Natives.setKernelUmountEnabled(checked)) {
-                                        execKsud("feature save", true)
-                                        isKernelUmountEnabled = checked
-                                    }
-                                }
-                            )
-                        }
-
-                        item {
-                            var suLogMode by rememberSaveable {
-                                mutableIntStateOf(
-                                    run {
-                                        val currentEnabled = Natives.isSuLogEnabled()
-                                        val savedPersist = prefs.getInt("sulog_mode", 0)
-                                        if (savedPersist == 2) 2 else if (!currentEnabled) 1 else 0
                                     }
                                 )
                             }
-                            var savedSuLogStatus by rememberSaveable { mutableStateOf("") }
-                            val suLogStatus by produceState(initialValue = savedSuLogStatus) {
-                                value = withContext(Dispatchers.IO) {
-                                    savedSuLogStatus = getFeatureStatus("sulog")
-                                    return@withContext savedSuLogStatus
-                                }
-                            }
-                            val suLogSummary = when (suLogStatus) {
-                                "unsupported" -> {
-                                    isSuLogEnabled =
-                                        true // some old kernel support sulog, we need allow show sulog in there
-                                    suLogMode = 0 // fix wrongly display
-                                    stringResource(id = R.string.feature_status_unsupported_summary)
-                                }
 
-                                "managed" -> stringResource(id = R.string.feature_status_managed_summary)
-                                else -> stringResource(id = R.string.settings_sulog_summary)
-                            }
-                            SettingsDropdownWidget(
-                                icon = Icons.Default.RemoveRedEye,
-                                title = stringResource(id = R.string.settings_sulog),
-                                description = suLogSummary,
-                                items = modeItems,
-                                enabled = suLogStatus == "supported",
-                                selectedIndex = suLogMode,
-                                onSelectedIndexChange = { index ->
-                                    when (index) {
-                                        // Default: enable and save to persist
-                                        0 -> if (Natives.setSuLogEnabled(true)) {
+                            item {
+                                var savedUmountStatus by rememberSaveable { mutableStateOf("") }
+                                val umountStatus by produceState(initialValue = savedUmountStatus) {
+                                    value = withContext(Dispatchers.IO) {
+                                        savedUmountStatus = getFeatureStatus("kernel_umount")
+                                        return@withContext savedUmountStatus
+                                    }
+                                }
+                                val umountSummary = when (umountStatus) {
+                                    "unsupported" -> stringResource(id = R.string.feature_status_unsupported_summary)
+                                    "managed" -> stringResource(id = R.string.feature_status_managed_summary)
+                                    else -> stringResource(id = R.string.settings_kernel_umount_summary)
+                                }
+                                SettingsSwitchWidget(
+                                    icon = Icons.Rounded.RemoveCircle,
+                                    title = stringResource(id = R.string.settings_kernel_umount),
+                                    description = umountSummary,
+                                    enabled = umountStatus == "supported",
+                                    checked = isKernelUmountEnabled,
+                                    onCheckedChange = { checked ->
+                                        if (Natives.setKernelUmountEnabled(checked)) {
                                             execKsud("feature save", true)
-                                            prefs.edit { putInt("sulog_mode", 0) }
-                                            suLogMode = 0
-                                            isSuLogEnabled = true
+                                            isKernelUmountEnabled = checked
                                         }
+                                    }
+                                )
+                            }
 
-                                        // Temporarily disable: save enabled state first, then disable
-                                        1 -> if (Natives.setSuLogEnabled(true)) {
-                                            execKsud("feature save", true)
-                                            if (Natives.setSuLogEnabled(false)) {
+                            item {
+                                var suLogMode by rememberSaveable {
+                                    mutableIntStateOf(
+                                        run {
+                                            val currentEnabled = Natives.isSuLogEnabled()
+                                            val savedPersist = prefs.getInt("sulog_mode", 0)
+                                            if (savedPersist == 2) 2 else if (!currentEnabled) 1 else 0
+                                        }
+                                    )
+                                }
+                                var savedSuLogStatus by rememberSaveable { mutableStateOf("") }
+                                val suLogStatus by produceState(initialValue = savedSuLogStatus) {
+                                    value = withContext(Dispatchers.IO) {
+                                        savedSuLogStatus = getFeatureStatus("sulog")
+                                        return@withContext savedSuLogStatus
+                                    }
+                                }
+                                val suLogSummary = when (suLogStatus) {
+                                    "unsupported" -> {
+                                        isSuLogEnabled =
+                                            true // some old kernel support sulog, we need allow show sulog in there
+                                        suLogMode = 0 // fix wrongly display
+                                        stringResource(id = R.string.feature_status_unsupported_summary)
+                                    }
+
+                                    "managed" -> stringResource(id = R.string.feature_status_managed_summary)
+                                    else -> stringResource(id = R.string.settings_sulog_summary)
+                                }
+                                SettingsDropdownWidget(
+                                    icon = Icons.Default.RemoveRedEye,
+                                    title = stringResource(id = R.string.settings_sulog),
+                                    description = suLogSummary,
+                                    items = modeItems,
+                                    enabled = suLogStatus == "supported",
+                                    selectedIndex = suLogMode,
+                                    onSelectedIndexChange = { index ->
+                                        when (index) {
+                                            // Default: enable and save to persist
+                                            0 -> if (Natives.setSuLogEnabled(true)) {
+                                                execKsud("feature save", true)
                                                 prefs.edit { putInt("sulog_mode", 0) }
-                                                suLogMode = 1
+                                                suLogMode = 0
+                                                isSuLogEnabled = true
+                                            }
+
+                                            // Temporarily disable: save enabled state first, then disable
+                                            1 -> if (Natives.setSuLogEnabled(true)) {
+                                                execKsud("feature save", true)
+                                                if (Natives.setSuLogEnabled(false)) {
+                                                    prefs.edit { putInt("sulog_mode", 0) }
+                                                    suLogMode = 1
+                                                    isSuLogEnabled = false
+                                                }
+                                            }
+
+                                            // Permanently disable: disable and save
+                                            2 -> if (Natives.setSuLogEnabled(false)) {
+                                                execKsud("feature save", true)
+                                                prefs.edit { putInt("sulog_mode", 2) }
+                                                suLogMode = 2
                                                 isSuLogEnabled = false
                                             }
                                         }
+                                    }
+                                )
+                            }
 
-                                        // Permanently disable: disable and save
-                                        2 -> if (Natives.setSuLogEnabled(false)) {
-                                            execKsud("feature save", true)
-                                            prefs.edit { putInt("sulog_mode", 2) }
-                                            suLogMode = 2
-                                            isSuLogEnabled = false
+                            item {
+                                // 卸载模块开关
+                                var umountChecked by rememberSaveable { mutableStateOf(Natives.isDefaultUmountModules()) }
+                                SettingsSwitchWidget(
+                                    icon = Icons.Rounded.FolderDelete,
+                                    title = stringResource(id = R.string.settings_umount_modules_default),
+                                    description = stringResource(id = R.string.settings_umount_modules_default_summary),
+                                    checked = umountChecked,
+                                    onCheckedChange = {
+                                        if (Natives.setDefaultUmountModules(it)) {
+                                            umountChecked = it
                                         }
                                     }
+                                )
+                            }
+                        }
+                    )
+                }
+            }
+
+            item {
+                // 应用设置卡片
+                SplicedColumnGroup(
+                    title = stringResource(R.string.app_settings),
+                    content = {
+                        item {
+                            // 更新检查开关
+                            var checkUpdate by rememberSaveable {
+                                mutableStateOf(prefs.getBoolean("check_update", true))
+                            }
+                            SettingsSwitchWidget(
+                                icon = Icons.Filled.Update,
+                                title = stringResource(R.string.settings_check_update),
+                                description = stringResource(R.string.settings_check_update_summary),
+                                checked = checkUpdate,
+                                onCheckedChange = { enabled ->
+                                    prefs.edit { putBoolean("check_update", enabled) }
+                                    checkUpdate = enabled
                                 }
                             )
                         }
 
                         item {
-                            // 卸载模块开关
-                            var umountChecked by rememberSaveable { mutableStateOf(Natives.isDefaultUmountModules()) }
-                            SettingsSwitchWidget(
-                                icon = Icons.Rounded.FolderDelete,
-                                title = stringResource(id = R.string.settings_umount_modules_default),
-                                description = stringResource(id = R.string.settings_umount_modules_default_summary),
-                                checked = umountChecked,
-                                onCheckedChange = {
-                                    if (Natives.setDefaultUmountModules(it)) {
-                                        umountChecked = it
-                                    }
+                            // 更多设置
+                            SettingsJumpPageWidget(
+                                icon = Icons.Filled.Settings,
+                                title = stringResource(R.string.more_settings),
+                                description = stringResource(R.string.more_settings),
+                                onClick = {
+                                    navigator.navigate(MoreSettingsScreenDestination)
                                 }
                             )
                         }
@@ -383,151 +431,120 @@ fun SettingsPage(navigator: DestinationsNavigator, bottomPadding: Dp, hazeState:
                 )
             }
 
-            // 应用设置卡片
-            SplicedColumnGroup(
-                title = stringResource(R.string.app_settings),
-                content = {
-                    item {
-                        // 更新检查开关
-                        var checkUpdate by rememberSaveable {
-                            mutableStateOf(prefs.getBoolean("check_update", true))
-                        }
-                        SettingsSwitchWidget(
-                            icon = Icons.Filled.Update,
-                            title = stringResource(R.string.settings_check_update),
-                            description = stringResource(R.string.settings_check_update_summary),
-                            checked = checkUpdate,
-                            onCheckedChange = { enabled ->
-                                prefs.edit { putBoolean("check_update", enabled) }
-                                checkUpdate = enabled
-                            }
-                        )
-                    }
-
-                    item {
-                        // 更多设置
-                        SettingsJumpPageWidget(
-                            icon = Icons.Filled.Settings,
-                            title = stringResource(R.string.more_settings),
-                            description = stringResource(R.string.more_settings),
-                            onClick = {
-                                navigator.navigate(MoreSettingsScreenDestination)
-                            }
-                        )
-                    }
-                }
-            )
-
-            // 工具卡片
-            var showBottomsheet by remember { mutableStateOf(false) }
-            SplicedColumnGroup(
-                title = stringResource(R.string.tools),
-                content = {
-                    item {
-                        SettingsBaseWidget(
-                            icon = Icons.Filled.BugReport,
-                            title = stringResource(R.string.send_log),
-                            onClick = {
-                                showBottomsheet = true
-                            }
-                        ) {}
-                    }
-
-                    if (ksuIsValid() && isSuLogEnabled) {
+            item {
+                // 工具卡片
+                SplicedColumnGroup(
+                    title = stringResource(R.string.tools),
+                    content = {
                         item {
-                            // 查看使用日志
-                            SettingsJumpPageWidget(
-                                icon = Icons.Filled.Visibility,
-                                title = stringResource(R.string.log_viewer_view_logs),
-                                description = stringResource(R.string.log_viewer_view_logs_summary),
+                            SettingsBaseWidget(
+                                icon = Icons.Filled.BugReport,
+                                title = stringResource(R.string.send_log),
                                 onClick = {
-                                    navigator.navigate(LogViewerScreenDestination)
+                                    showBottomsheet = true
                                 }
-                            )
+                            ) {}
                         }
-                    }
 
-                    if (ksuIsValid()) {
-                        item {
-                            SettingsJumpPageWidget(
-                                icon = Icons.Filled.FolderOff,
-                                title = stringResource(R.string.umount_path_manager),
-                                description = stringResource(R.string.umount_path_manager_summary),
-                                onClick = {
-                                    navigator.navigate(UmountManagerScreenDestination)
-                                }
-                            )
-                        }
-                    }
-
-                    if (Natives.isLkmMode) {
-                        item {
-                            UninstallItem(navigator) {
-                                loadingDialog.withLoading(it)
-                            }
-                        }
-                    }
-                }
-            )
-            if (showBottomsheet) {
-                LogBottomSheet(
-                    onDismiss = { showBottomsheet = false },
-                    onSaveLog = {
-                        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH_mm")
-                        val current = LocalDateTime.now().format(formatter)
-                        exportBugreportLauncher.launch("KernelSU_bugreport_${current}.tar.gz")
-                        showBottomsheet = false
-                    },
-                    onShareLog = {
-                        scope.launch {
-                            val bugreport = loadingDialog.withLoading {
-                                withContext(Dispatchers.IO) {
-                                    getBugreportFile(context)
-                                }
-                            }
-
-                            val uri = FileProvider.getUriForFile(
-                                context,
-                                "${BuildConfig.APPLICATION_ID}.fileprovider",
-                                bugreport
-                            )
-
-                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                putExtra(Intent.EXTRA_STREAM, uri)
-                                setDataAndType(uri, "application/gzip")
-                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                            }
-
-                            context.startActivity(
-                                Intent.createChooser(
-                                    shareIntent,
-                                    context.getString(R.string.send_log)
+                        if (ksuIsValid() && isSuLogEnabled) {
+                            item {
+                                // 查看使用日志
+                                SettingsJumpPageWidget(
+                                    icon = Icons.Filled.Visibility,
+                                    title = stringResource(R.string.log_viewer_view_logs),
+                                    description = stringResource(R.string.log_viewer_view_logs_summary),
+                                    onClick = {
+                                        navigator.navigate(LogViewerScreenDestination)
+                                    }
                                 )
-                            )
+                            }
+                        }
 
-                            showBottomsheet = false
+                        if (ksuIsValid()) {
+                            item(visible = isKernelUmountEnabled) {
+                                SettingsJumpPageWidget(
+                                    icon = Icons.Filled.FolderOff,
+                                    title = stringResource(R.string.umount_path_manager),
+                                    description = stringResource(R.string.umount_path_manager_summary),
+                                    onClick = {
+                                        navigator.navigate(UmountManagerScreenDestination)
+                                    }
+                                )
+                            }
+                        }
+
+                        if (Natives.isLkmMode) {
+                            item {
+                                UninstallItem(navigator) {
+                                    loadingDialog.withLoading(it)
+                                }
+                            }
                         }
                     }
                 )
+            }
+
+            if (showBottomsheet) {
+                item {
+                    LogBottomSheet(
+                        onDismiss = { showBottomsheet = false },
+                        onSaveLog = {
+                            val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH_mm")
+                            val current = LocalDateTime.now().format(formatter)
+                            exportBugreportLauncher.launch("KernelSU_bugreport_${current}.tar.gz")
+                            showBottomsheet = false
+                        },
+                        onShareLog = {
+                            scope.launch {
+                                val bugreport = loadingDialog.withLoading {
+                                    withContext(Dispatchers.IO) {
+                                        getBugreportFile(context)
+                                    }
+                                }
+
+                                val uri = FileProvider.getUriForFile(
+                                    context,
+                                    "${BuildConfig.APPLICATION_ID}.fileprovider",
+                                    bugreport
+                                )
+
+                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                    putExtra(Intent.EXTRA_STREAM, uri)
+                                    setDataAndType(uri, "application/gzip")
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+
+                                context.startActivity(
+                                    Intent.createChooser(
+                                        shareIntent,
+                                        context.getString(R.string.send_log)
+                                    )
+                                )
+
+                                showBottomsheet = false
+                            }
+                        }
+                    )
+                }
             }
 
             // 关于卡片
-            SplicedColumnGroup(
-                title = stringResource(R.string.about),
-                content = {
-                    item {
-                        SettingsBaseWidget(
-                            icon = Icons.Filled.Info,
-                            title = stringResource(R.string.about),
-                            onClick = {
-                                aboutDialog.show()
-                            }
-                        ) {}
+            item {
+                SplicedColumnGroup(
+                    title = stringResource(R.string.about),
+                    content = {
+                        item {
+                            SettingsBaseWidget(
+                                icon = Icons.Filled.Info,
+                                title = stringResource(R.string.about),
+                                onClick = {
+                                    aboutDialog.show()
+                                }
+                            ) {}
+                        }
                     }
-                }
-            )
-
-            Spacer(modifier = Modifier.height(bottomPadding + 16.dp))
+                )
+            }
         }
     }
 }

@@ -282,7 +282,7 @@ private fun SuperUserFab(
     bottomPadding: Dp
 ) {
     VerticalExpandableFab(
-        modifier = Modifier.padding(bottom = bottomPadding),
+        modifier = Modifier.padding(bottom = bottomPadding + 5.dp),
         menuItems = if (viewModel.showBatchActions && viewModel.selectedApps.isNotEmpty()) {
             FabMenuPresets.getBatchActionMenuItems(
                 onCancel = {
@@ -407,15 +407,12 @@ private fun SuperUserContent(
             contentPadding = remember {
                 PaddingValues(
                     start = 0.dp,
-                    top = 0.dp,
+                    top = innerPadding.calculateTopPadding() + 5.dp,
                     end = 0.dp,
-                    bottom = 85.dp
+                    bottom = bottomPadding + innerPadding.calculateBottomPadding() + 72.dp + 5.dp + 5.dp // FAB + bottom padding of FAB x2
                 )
             },
         ) {
-            item {
-                Spacer(modifier = Modifier.height(innerPadding.calculateTopPadding() + 5.dp))
-            }
             splicedLazyColumnGroup(
                 items = filteredAndSortedAppGroups,
                 key = { _, appGroup -> "${appGroup.uid}-${appGroup.mainApp.packageName}" },
@@ -450,9 +447,6 @@ private fun SuperUserContent(
                     },
                     viewModel = viewModel
                 )
-            }
-            item {
-                Spacer(modifier = Modifier.height(bottomPadding))
             }
         }
     }

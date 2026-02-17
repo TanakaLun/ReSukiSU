@@ -333,7 +333,7 @@ fun ModulePage(navigator: DestinationsNavigator, bottomPadding: Dp, hazeState: H
             if (hideInstallButton) return@Scaffold
 
             FloatingActionButton(
-                modifier = Modifier.padding(bottom = bottomPadding),
+                modifier = Modifier.padding(bottom = bottomPadding + 5.dp),
                 contentColor = MaterialTheme.colorScheme.onPrimary,
                 containerColor = MaterialTheme.colorScheme.primary,
                 onClick = {
@@ -455,7 +455,7 @@ fun ModulePage(navigator: DestinationsNavigator, bottomPadding: Dp, hazeState: H
                     },
                     context = context,
                     snackBarHost = snackBarHost,
-                    bottomPadding = bottomPadding,
+                    bottomPadding = bottomPadding + innerPadding.calculateBottomPadding(),
                     topPadding = innerPadding.calculateTopPadding(),
                     hazeState = hazeState
                 )
@@ -973,16 +973,12 @@ private fun ModuleList(
             contentPadding = remember {
                 PaddingValues(
                     start = 16.dp,
-                    top = 0.dp,
+                    top = topPadding + 5.dp,
                     end = 16.dp,
-                    bottom = 65.dp
+                    bottom = bottomPadding + 72.dp + 5.dp + 5.dp // FAB + bottom padding of FAB
                 )
             },
         ) {
-            item {
-                Spacer(modifier = Modifier.height(topPadding))
-            }
-
             if (metaModuleWarningText != null) {
                 item(
                     key = "warning"
@@ -1053,10 +1049,6 @@ private fun ModuleList(
                 )
 
                 Spacer(Modifier.height(1.dp))
-            }
-
-            item {
-                Spacer(modifier = Modifier.height(bottomPadding))
             }
         }
 

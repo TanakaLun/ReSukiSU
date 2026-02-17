@@ -3,6 +3,7 @@ package com.resukisu.resukisu.ui.screen
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -187,11 +188,13 @@ fun UmountManagerScreen(navigator: DestinationsNavigator) {
                     modifier = Modifier
                         .fillMaxSize()
                         .nestedScroll(scrollBehavior.nestedScrollConnection),
+                    contentPadding = PaddingValues(
+                        top = paddingValues.calculateTopPadding() + 5.dp,
+                        start = 0.dp,
+                        end = 0.dp,
+                        bottom = paddingValues.calculateBottomPadding() + 72.dp + 5.dp + 5.dp // FAB
+                    )
                 ) {
-                    item {
-                        Spacer(modifier = Modifier.height(paddingValues.calculateTopPadding()))
-                    }
-
                     item {
                         WarningCard(
                             modifier = Modifier.padding(horizontal = 16.dp),
@@ -243,15 +246,16 @@ fun UmountManagerScreen(navigator: DestinationsNavigator) {
                                 }
                             }
                         ) {
+                            val confirmDeleteSummary = stringResource(
+                                R.string.confirm_delete_umount_path,
+                                entry.path
+                            )
                             IconButton(
                                 onClick = {
                                     scope.launch {
                                         val confirmResult = confirmDialog.awaitConfirm(
                                             title = confirmDelete,
-                                            content = context.getString(
-                                                R.string.confirm_delete_umount_path,
-                                                entry.path
-                                            )
+                                            content = confirmDeleteSummary
                                         )
                                         if (confirmResult != ConfirmResult.Confirmed)
                                             return@launch
@@ -268,10 +272,6 @@ fun UmountManagerScreen(navigator: DestinationsNavigator) {
                                 )
                             }
                         }
-                    }
-
-                    item {
-                        Spacer(modifier = Modifier.height(paddingValues.calculateBottomPadding()))
                     }
                 }
             }
