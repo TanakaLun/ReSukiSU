@@ -78,7 +78,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.core.content.edit
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.annotation.RootGraph
@@ -174,11 +173,6 @@ fun updateModuleInstallStatus(
 @Destination<RootGraph>
 fun FlashScreen(navigator: DestinationsNavigator, flashIt: FlashIt) {
     val context = LocalContext.current
-
-    val shouldAutoExit = remember {
-        val sharedPref = context.getSharedPreferences("kernel_flash_prefs", Context.MODE_PRIVATE)
-        sharedPref.getBoolean("auto_exit_after_flash", false)
-    }
 
     // 是否通过从外部启动的模块安装
     val isExternalInstall = remember {
@@ -333,24 +327,6 @@ fun FlashScreen(navigator: DestinationsNavigator, flashIt: FlashIt) {
                         shouldWarningUserMetaModule = false
                     }
                 }
-
-                // 如果是外部安装或需要自动退出的模块更新且不需要重启，延迟后自动返回
-                if (isExternalInstall || shouldAutoExit) {
-                    scope.launch {
-                        while (shouldWarningUserMetaModule) {
-                            kotlinx.coroutines.delay(100)
-                        }
-                        kotlinx.coroutines.delay(1000)
-                        while (shouldWarningUserMetaModule) {
-                            kotlinx.coroutines.delay(100)
-                        }
-                        if (shouldAutoExit) {
-                            val sharedPref = context.getSharedPreferences("kernel_flash_prefs", Context.MODE_PRIVATE)
-                            sharedPref.edit { remove("auto_exit_after_flash") }
-                        }
-                        (context as? ComponentActivity)?.finish()
-                    }
-                }
             }, onStdout = {
                 tempText = "$it\n"
                 if (tempText.startsWith("[H[J")) { // clear command
@@ -453,38 +429,6 @@ fun FlashScreen(navigator: DestinationsNavigator, flashIt: FlashIt) {
                     scope.launch {
                         kotlinx.coroutines.delay(500)
                         navigator.navigate(FlashScreenDestination(nextFlashIt))
-                    }
-                } else if ((isExternalInstall || shouldAutoExit) && flashIt is FlashIt.FlashModules && flashIt.currentIndex >= flashIt.uris.size - 1) {
-                    // 如果是外部安装或需要自动退出且是最后一个模块，安装完成后自动返回
-                    scope.launch {
-                        while (shouldWarningUserMetaModule) {
-                            kotlinx.coroutines.delay(100)
-                        }
-                        kotlinx.coroutines.delay(1000)
-                        while (shouldWarningUserMetaModule) {
-                            kotlinx.coroutines.delay(100)
-                        }
-                        if (shouldAutoExit) {
-                            val sharedPref = context.getSharedPreferences("kernel_flash_prefs", Context.MODE_PRIVATE)
-                            sharedPref.edit { remove("auto_exit_after_flash") }
-                        }
-                        (context as? ComponentActivity)?.finish()
-                    }
-                } else if ((isExternalInstall || shouldAutoExit) && flashIt is FlashIt.FlashModule) {
-                    // 如果是外部安装或需要自动退出的单个模块，安装完成后自动返回
-                    scope.launch {
-                        while (shouldWarningUserMetaModule) {
-                            kotlinx.coroutines.delay(100)
-                        }
-                        kotlinx.coroutines.delay(1000)
-                        while (shouldWarningUserMetaModule) {
-                            kotlinx.coroutines.delay(100)
-                        }
-                        if (shouldAutoExit) {
-                            val sharedPref = context.getSharedPreferences("kernel_flash_prefs", Context.MODE_PRIVATE)
-                            sharedPref.edit { remove("auto_exit_after_flash") }
-                        }
-                        (context as? ComponentActivity)?.finish()
                     }
                 }
             }, onStdout = {

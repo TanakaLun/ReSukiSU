@@ -57,6 +57,8 @@ import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.annotation.RootGraph
 import com.ramcosta.composedestinations.generated.NavGraphs
 import com.ramcosta.composedestinations.generated.destinations.ExecuteModuleActionScreenDestination
+import com.ramcosta.composedestinations.generated.destinations.FlashScreenDestination
+import com.ramcosta.composedestinations.generated.destinations.InstallScreenDestination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import com.ramcosta.composedestinations.spec.NavHostGraphSpec
 import com.ramcosta.composedestinations.utils.rememberDestinationsNavigator
@@ -64,10 +66,12 @@ import com.resukisu.resukisu.Natives
 import com.resukisu.resukisu.ui.activity.component.NavigationBar
 import com.resukisu.resukisu.ui.activity.util.ThemeChangeContentObserver
 import com.resukisu.resukisu.ui.activity.util.ThemeUtils
-import com.resukisu.resukisu.ui.activity.util.UltraActivityUtils
 import com.resukisu.resukisu.ui.component.InstallConfirmationDialog
+import com.resukisu.resukisu.ui.component.ZipFileDetector
 import com.resukisu.resukisu.ui.component.ZipFileInfo
+import com.resukisu.resukisu.ui.component.ZipType
 import com.resukisu.resukisu.ui.screen.BottomBarDestination
+import com.resukisu.resukisu.ui.screen.FlashIt
 import com.resukisu.resukisu.ui.theme.KernelSUTheme
 import com.resukisu.resukisu.ui.theme.ThemeConfig
 import com.resukisu.resukisu.ui.util.LocalHandlePageChange
@@ -75,6 +79,7 @@ import com.resukisu.resukisu.ui.util.LocalPagerState
 import com.resukisu.resukisu.ui.util.LocalSelectedPage
 import com.resukisu.resukisu.ui.util.LocalSnackbarHost
 import com.resukisu.resukisu.ui.util.install
+import com.resukisu.resukisu.ui.util.rootAvailable
 import com.resukisu.resukisu.ui.viewmodel.HomeViewModel
 import com.resukisu.resukisu.ui.viewmodel.SuperUserViewModel
 import com.resukisu.resukisu.ui.webui.WebUIActivity
@@ -169,6 +174,7 @@ class MainActivity : ComponentActivity() {
 
             setContent {
                 KernelSUTheme {
+                    val context = LocalContext.current
                     val navController = rememberNavController()
                     val snackBarHostState = remember { SnackbarHostState() }
 
@@ -179,7 +185,37 @@ class MainActivity : ComponentActivity() {
                         zipFiles = pendingZipFiles.value,
                         onConfirm = { confirmedFiles ->
                             showConfirmationDialog.value = false
-                            UltraActivityUtils.navigateToFlashScreen(this, confirmedFiles, navigator)
+                            lifecycleScope.launch(Dispatchers.IO) {
+                                val moduleUris = confirmedFiles.filter { it.type == ZipType.MODULE }
+                                    .map { it.uri }
+                                val kernelUris = confirmedFiles.filter { it.type == ZipType.KERNEL }
+                                    .map { it.uri }
+
+                                when {
+                                    kernelUris.isNotEmpty() && moduleUris.isEmpty() -> {
+                                        if (kernelUris.size == 1 && rootAvailable()) {
+                                            withContext(Dispatchers.Main) {
+                                                navigator.navigate(
+                                                    InstallScreenDestination(
+                                                        preselectedKernelUri = kernelUris.first()
+                                                            .toString()
+                                                    )
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    moduleUris.isNotEmpty() -> {
+                                        withContext(Dispatchers.Main) {
+                                            navigator.navigate(
+                                                FlashScreenDestination(
+                                                    FlashIt.FlashModules(ArrayList(moduleUris))
+                                                )
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         },
                         onDismiss = {
                             showConfirmationDialog.value = false
@@ -189,16 +225,19 @@ class MainActivity : ComponentActivity() {
                     )
 
                     LaunchedEffect(zipUri) {
-                        if (!zipUri.isNullOrEmpty()) {
-                            // 检测 ZIP 文件类型并显示确认对话框
-                            lifecycleScope.launch {
-                                UltraActivityUtils.detectZipTypeAndShowConfirmation(this@MainActivity, zipUri) { infos ->
-                                    if (infos.isNotEmpty()) {
-                                        pendingZipFiles.value = infos
-                                        showConfirmationDialog.value = true
-                                    } else {
-                                        finish()
-                                    }
+                        if (zipUri.isNullOrEmpty()) return@LaunchedEffect
+
+                        lifecycleScope.launch(Dispatchers.IO) {
+                            val zipFileInfos = zipUri.map { uri ->
+                                ZipFileDetector.parseZipFile(context, uri)
+                            }.filter { it.type != ZipType.UNKNOWN }
+
+                            withContext(Dispatchers.Main) {
+                                if (zipFileInfos.isNotEmpty()) {
+                                    pendingZipFiles.value = zipFileInfos
+                                    showConfirmationDialog.value = true
+                                } else {
+                                    finish()
                                 }
                             }
                         }
@@ -450,8 +489,7 @@ private fun MainScreenContent(
             },
             containerColor = Color.Transparent,
         ) { innerPadding ->
-            val bottomPadding = remember(innerPadding) { innerPadding.calculateBottomPadding() }
-            content(bottomPadding)
+            content(innerPadding.calculateBottomPadding())
         }
     } else {
         Row(modifier = Modifier.fillMaxSize()) {

@@ -2,32 +2,58 @@ package com.resukisu.resukisu.ui.component
 
 import android.content.Context
 import android.net.Uri
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.GetApp
 import androidx.compose.material.icons.filled.Memory
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.resukisu.resukisu.R
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.io.BufferedReader
 import java.io.IOException
+import java.io.InputStream
 import java.io.InputStreamReader
 import java.util.zip.ZipInputStream
 
 enum class ZipType {
     MODULE,
     KERNEL,
-    UNKNOWN
+    UNKNOWN;
+
+    companion object {
+        fun detect(files: Set<String>): ZipType = when {
+            files.any { it.endsWith("module.prop") } -> MODULE
+            files.any { it.endsWith("anykernel.sh") } && files.any { it.startsWith("tools/") } -> KERNEL
+            else -> UNKNOWN
+        }
+    }
 }
 
 data class ZipFileInfo(
@@ -205,26 +231,78 @@ object ZipFileDetector {
         return zipInfo
     }
 
-    suspend fun detectAndParseZipFiles(context: Context, zipUris: List<Uri>): List<ZipFileInfo> {
-        return withContext(Dispatchers.IO) {
-            val zipFileInfos = mutableListOf<ZipFileInfo>()
 
-            for (uri in zipUris) {
-                val zipType = detectZipType(context, uri)
-                val zipInfo = when (zipType) {
-                    ZipType.MODULE -> parseModuleInfo(context, uri)
-                    ZipType.KERNEL -> parseKernelInfo(context, uri)
-                    ZipType.UNKNOWN -> ZipFileInfo(
-                        uri = uri,
-                        type = ZipType.UNKNOWN,
-                        name = context.getString(R.string.unknown_file)
-                    )
+    private fun parseSimpleProps(inputStream: InputStream): Map<String, String> {
+        val map = mutableMapOf<String, String>()
+        inputStream.bufferedReader().useLines { lines ->
+            lines.forEach { line ->
+                if (line.isNotBlank() && !line.startsWith("#") && line.contains("=")) {
+                    val parts = line.split("=", limit = 2)
+                    map[parts[0].trim()] = parts[1].trim()
                 }
-                zipFileInfos.add(zipInfo)
             }
-
-            zipFileInfos.filter { it.type != ZipType.UNKNOWN }
         }
+        return map
+    }
+
+    private fun parseShellVariables(inputStream: InputStream): Map<String, String> {
+        val map = mutableMapOf<String, String>()
+        val reader = inputStream.bufferedReader()
+        var line: String? = reader.readLine()
+        while (line != null) {
+            if (line.contains("=")) {
+                val key = line.substringBefore("=").trim()
+                val value = line.substringAfter("=").trim()
+                    .removeSurrounding("\"").removeSurrounding("'")
+                    .split(";")[0].trim()
+                map[key] = value
+            }
+            line = reader.readLine()
+        }
+        return map
+    }
+
+    fun parseZipFile(context: Context, uri: Uri): ZipFileInfo {
+        val props = mutableMapOf<String, String>()
+        val foundFiles = mutableSetOf<String>()
+
+        try {
+            context.contentResolver.openInputStream(uri)?.use { fis ->
+                ZipInputStream(fis).use { zis ->
+                    var entry = zis.nextEntry
+                    while (entry != null) {
+                        val name = entry.name
+                        foundFiles.add(name)
+
+                        when {
+                            name.endsWith("module.prop") -> {
+                                props.putAll(parseSimpleProps(zis))
+                            }
+
+                            name.endsWith("anykernel.sh") -> {
+                                props.putAll(parseShellVariables(zis))
+                            }
+                        }
+                        zis.closeEntry()
+                        entry = zis.nextEntry
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        val type = ZipType.detect(foundFiles)
+
+        return ZipFileInfo(
+            uri = uri,
+            type = type,
+            name = props["name"] ?: props["kernel.string"] ?: "Unknown",
+            version = props["version"] ?: props["kernel.version"] ?: "",
+            author = props["author"] ?: props["kernel.author"] ?: "",
+            description = props["description"] ?: "",
+            supported = props["supported.versions"] ?: ""
+        )
     }
 }
 

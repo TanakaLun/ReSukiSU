@@ -2,6 +2,7 @@ package com.resukisu.resukisu.ui.component
 
 import androidx.compose.runtime.Composable
 import com.resukisu.resukisu.Natives
+import com.resukisu.resukisu.ui.util.rootAvailable
 
 @Composable
 inline fun KsuIsValid(
@@ -31,4 +32,11 @@ fun ksuIsValid() : Boolean {
     tested = true
 
     return ksuIsValid
+}
+
+/**
+ * Check is full feature
+ */
+fun isFullFeatured(): Boolean {
+    return ksuIsValid() && !Natives.requireNewKernel() && rootAvailable()
 }
