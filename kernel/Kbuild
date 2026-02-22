@@ -313,6 +313,12 @@ ifeq ($(CONFIG_KSU_MANUAL_HOOK), y)
     $(error You should integrate $(REPO_NAME) in your kernel correctly.)
   endif
 
+  ifeq ($(shell grep -q "is_ksu_transition" $(srctree)/security/selinux/hooks.c; echo $$?),0)
+    $(info -- is_ksu_transition is incompatible hook)
+    $(info -- Read: https://resukisu.github.io/guide/manual-integrate.html)
+    $(error You should integrate $(REPO_NAME) in your kernel correctly.)
+  endif
+
   ifeq ($(CONFIG_KSU_MANUAL_HOOK_AUTO_INPUT_HOOK), y)
     $(info -- $(REPO_NAME)/manual_hook: You are using input_handler for input hooks.)
   else
@@ -371,16 +377,6 @@ ifeq ($(CONFIG_KSU_MANUAL_HOOK), y)
     $(info -- You lost ksu_handle_sys_reboot hook in your kernel)
     $(info -- Read: https://resukisu.github.io/guide/manual-integrate.html)
     $(error You should integrate $(REPO_NAME) in your kernel.)
-  endif
-
-  ifeq ($(shell test $(VERSION) -lt 4 || { test $(VERSION) -eq 4 && test $(PATCHLEVEL) -lt 10; } && echo y),y)
-    ifeq ($(shell grep -q "is_ksu_transition" $(srctree)/security/selinux/hooks.c; echo $$?),0)
-      $(info -- $(REPO_NAME)/manual_hook: is_ksu_transition found)
-    else
-      $(info -- You lost is_ksu_transition hook in your kernel)
-      $(info -- Read: https://resukisu.github.io/guide/manual-integrate.html)
-      $(error You should integrate $(REPO_NAME) in your kernel.)
-    endif
   endif
 endif
 
