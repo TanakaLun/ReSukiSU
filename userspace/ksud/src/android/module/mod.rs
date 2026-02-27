@@ -592,7 +592,7 @@ pub fn run_action(id: &str) -> Result<()> {
     validate_module_id(id)?;
 
     let action_script_path = format!("/data/adb/modules/{id}/action.sh");
-    
+
     exec_script(&action_script_path, true)
 }
 
