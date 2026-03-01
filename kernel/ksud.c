@@ -136,7 +136,7 @@ void on_boot_completed(void)
 {
     ksu_boot_completed = true;
     pr_info("on_boot_completed!\n");
-    track_throne(true, false);
+    track_throne(true);
 }
 
 static const char __user *get_user_arg_ptr(struct user_arg_ptr argv, int nr)

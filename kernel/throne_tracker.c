@@ -19,16 +19,12 @@
 #include "dynamic_manager.h"
 
 #define SYSTEM_PACKAGES_LIST_PATH "/data/system/packages.list"
-#define MAX_APP_ID 10000 // FIRST_APPLICATION_UID - LAST_APPLICATION_UID = 19999
 
 struct uid_data {
     struct list_head list;
     u32 uid;
     char package[KSU_MAX_PACKAGE_NAME];
 };
-
-static unsigned long *last_app_id_map = NULL;
-static DEFINE_MUTEX(app_list_lock);
 
 static void crown_manager(const char *apk, struct list_head *uid_data,
                           u8 signature_index)
@@ -264,7 +260,7 @@ static bool is_uid_exist(uid_t uid, char *package, void *data)
     return exist;
 }
 
-void track_throne(bool prune_only, bool force_search_manager)
+void track_throne(bool prune_only)
 {
     struct list_head uid_list;
     struct uid_data *np, *n;
@@ -273,30 +269,7 @@ void track_throne(bool prune_only, bool force_search_manager)
     loff_t pos = 0;
     loff_t line_start = 0;
     char buf[KSU_MAX_PACKAGE_NAME];
-    bool need_search = force_search_manager;
 
-    // init uid list head, bitmap
-    unsigned long *curr_app_id_map = NULL;
-    unsigned long *diff_map = NULL;
-
-    mutex_lock(&app_list_lock);
-    if (unlikely(!last_app_id_map)) {
-        last_app_id_map = ksu_bitmap_zalloc(MAX_APP_ID, GFP_KERNEL);
-    }
-    mutex_unlock(&app_list_lock);
-
-    curr_app_id_map = ksu_bitmap_zalloc(MAX_APP_ID, GFP_KERNEL);
-    if (!curr_app_id_map) {
-        pr_err("track_throne: failed to allocate curr_app_id_map\n");
-        return;
-    }
-
-    diff_map = ksu_bitmap_zalloc(MAX_APP_ID, GFP_KERNEL);
-    if (!diff_map) {
-        pr_err("track_throne: failed to allocate diff_map\n");
-        ksu_bitmap_free(curr_app_id_map); // Free allocated memory when failed
-        return;
-    }
     INIT_LIST_HEAD(&uid_list);
 
     fp = ksu_filp_open_compat(SYSTEM_PACKAGES_LIST_PATH, O_RDONLY, 0);
@@ -343,13 +316,6 @@ void track_throne(bool prune_only, bool force_search_manager)
         data->uid = res;
         strncpy(data->package, package, KSU_MAX_PACKAGE_NAME);
         list_add_tail(&data->list, &uid_list);
-
-        u16 appid = res % PER_USER_RANGE;
-
-        if (appid >= FIRST_APPLICATION_UID &&
-            appid < (FIRST_APPLICATION_UID + MAX_APP_ID)) {
-            set_bit(appid - FIRST_APPLICATION_UID, curr_app_id_map);
-        }
         // reset line start
         line_start = pos;
     }
@@ -359,43 +325,12 @@ void track_throne(bool prune_only, bool force_search_manager)
     if (prune_only)
         goto prune;
 
-    // check uninstalled is manager, and
-    // run search_manager when new application installed
-    mutex_lock(&app_list_lock);
+    // unregister all managers first
+    ksu_unregister_all_manager();
 
-    if (bitmap_andnot(diff_map, last_app_id_map, curr_app_id_map, MAX_APP_ID)) {
-        int bit = -1;
-        while ((bit = find_next_bit(diff_map, MAX_APP_ID, bit + 1)) <
-               MAX_APP_ID) {
-            u16 appid = bit + FIRST_APPLICATION_UID;
-            // we check the uninstalled app is manager or not
-            // if it is manager, unregister its appid,
-            // because it is invalid for now,
-            // if keep them alive, we may grant unknown app manager privillage
-            if (ksu_is_manager_appid(appid)) {
-                pr_info("Manager APK removed, invalidate previous App ID: %d\n",
-                        appid);
-                ksu_unregister_manager(appid);
-            }
-        }
-    }
-
-    if (bitmap_andnot(diff_map, curr_app_id_map, last_app_id_map, MAX_APP_ID)) {
-        if (!bitmap_empty(diff_map, MAX_APP_ID)) {
-            // because we maybe have more than 1 manager alive in same time,
-            // always search manager when user install new apps
-            need_search = true;
-        }
-    }
-
-    bitmap_copy(last_app_id_map, curr_app_id_map, MAX_APP_ID);
-    mutex_unlock(&app_list_lock);
-
-    if (need_search) {
-        pr_info("Searching for manager(s)...\n");
-        search_manager("/data/app", 2, &uid_list);
-        pr_info("Manager search finished\n");
-    }
+    pr_info("Searching for manager(s)...\n");
+    search_manager("/data/app", 2, &uid_list);
+    pr_info("Manager search finished\n");
 
 prune:
     // then prune the allowlist
@@ -406,11 +341,6 @@ out:
         list_del(&np->list);
         kfree(np);
     }
-
-    if (curr_app_id_map)
-        ksu_bitmap_free(curr_app_id_map);
-    if (diff_map)
-        ksu_bitmap_free(diff_map);
 }
 
 void ksu_throne_tracker_init(void)
