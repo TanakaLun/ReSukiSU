@@ -1,6 +1,5 @@
 #! /usr/bin/env bash
 
-# 目标包名: io.tl.yukinosu
 word1="io"
 word2="tl"
 word3="yukinosu"
@@ -22,3 +21,6 @@ find . -type f -exec sed -i \
     -e "s/io\/resukisu\/resukisu/$word4\/$word2\/$word3/g" \
     -e "s/io_resukisu_resukisu/${word4}_${word2}_${word3}/g" \
     -e "s/com_resukisu_resukisu/${word1}_${word2}_${word3}/g" {} +
+    
+# Replace app label in AndroidManifest.xml
+find . -name "AndroidManifest.xml" -exec sed -i 's/android:label="@string\/app_name"/android:label="YukinoSU"/g' {} \;
