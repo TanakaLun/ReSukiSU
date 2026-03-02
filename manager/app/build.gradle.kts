@@ -35,7 +35,7 @@ val baseCFlags = listOf(
 val baseCppFlags = baseCFlags + "-fno-rtti"
 
 android {
-    namespace = "com.resukisu.resukisu"
+    namespace = "io.tl.su"
 
     buildTypes {
         debug {
@@ -130,7 +130,7 @@ android {
         }
 
         ndk {
-            abiFilters += listOf("arm64-v8a", "x86_64", "armeabi-v7a")
+            abiFilters += listOf("arm64-v8a")
         }
     }
 
