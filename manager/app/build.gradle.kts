@@ -35,7 +35,7 @@ val baseCFlags = listOf(
 val baseCppFlags = baseCFlags + "-fno-rtti"
 
 android {
-    namespace = "io.tl.su"
+    namespace = "com.resukisu.resukisu"
 
     buildTypes {
         debug {

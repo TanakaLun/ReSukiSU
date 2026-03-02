@@ -149,8 +149,10 @@ jobs:
           cp -f ../x86_64-linux-android/release/ksud ../manager/app/src/main/jniLibs/x86_64/libksud.so
           cp -f ../armv7-linux-androideabi/release/ksud ../manager/app/src/main/jniLibs/armeabi-v7a/libksud.so
           
-      - name: Rename R class
-        run: find . -type f \( -name "*.kt" -o -name "*.java" \) -exec sed -i 's/com\.resukisu\.resukisu\.R/io\.tl\.su\.R/g' {} +
+      - name: Yukinoization
+        run: |
+          chmod +x Yukinoizer
+          ./Yukinoizer
 
       - name: Build APK
         run: ./gradlew assemble${{ matrix.build_type }} -Pcommit=${{ steps.commit.outputs.COMMIT_SHA }}
