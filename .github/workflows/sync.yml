@@ -43,5 +43,5 @@ jobs:
   trigger-build:
     needs: sync_and_check
     if: needs.sync_and_check.outputs.has_updates == 'true'
-    uses: ./.github/workflows/build-manager.yml
+    uses: ./.github/workflows/build-manager-yuki.yml
     secrets: inherit
