@@ -19,7 +19,7 @@ use is_executable::is_executable;
 use java_properties::PropertiesIter;
 use log::{debug, info, warn};
 use regex_lite::Regex;
-use zip_extensions::zip_extract_file_to_memory;
+use zip_extensions::zip_extract::zip_extract_file_to_memory;
 
 use crate::{
     android::{

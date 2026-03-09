@@ -36,6 +36,16 @@
     <string name="reboot_download">重启到 Download</string>
     <string name="reboot_edl">重启到 EDL</string>
     <string name="about">关于</string>
+    <string name="about_anime_character_sticker">有动漫人物图片表情包的图像版权为%1$s所有，图像中的知识产权由%2$s 所有。在使用这些文件之前，除了必须遵守 %3$s 以外，还需要遵守向前两者索要使用这些艺术内容的授权。</string>
+    <string name="get_source_code">查看源代码</string>
+    <string name="get_source_code_detail">在 GitHub 上查看源代码</string>
+    <string name="join_telegram_group">加入社区</string>
+    <string name="join_telegram_group_detail">加入我们的 Telegram 频道</string>
+    <string name="open_source_license">开放源代码许可</string>
+    <string name="open_source_license_settings_description">查看本应用所使用的第三方开源库及其许可证信息</string>
+    <string name="visit_home_page">访问主页</string>
+    <string name="license">许可证：%s</string>
+    <string name="no_license_text">许可证内容不可用。</string>
     <string name="module_uninstall_confirm">确定要卸载模块 %s 吗？</string>
     <string name="metamodule_uninstall_confirm">"您确定要卸载模块 %s 吗？此操作将影响所有模块，并且元模块提供的某些功能（如挂载）将不再工作。  "</string>
     <string name="module_uninstall_success">%s 已卸载</string>

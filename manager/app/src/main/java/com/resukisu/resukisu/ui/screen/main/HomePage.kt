@@ -90,9 +90,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.content.pm.PackageInfoCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.ramcosta.composedestinations.generated.destinations.InstallScreenDestination
-import com.ramcosta.composedestinations.generated.destinations.SuSFSConfigScreenDestination
-import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import com.resukisu.resukisu.BuildConfig
 import com.resukisu.resukisu.KernelSUApplication
 import com.resukisu.resukisu.KernelVersion
@@ -101,6 +98,8 @@ import com.resukisu.resukisu.R
 import com.resukisu.resukisu.ui.component.KsuIsValid
 import com.resukisu.resukisu.ui.component.WarningCard
 import com.resukisu.resukisu.ui.component.rememberConfirmDialog
+import com.resukisu.resukisu.ui.navigation.LocalNavigator
+import com.resukisu.resukisu.ui.navigation.Route
 import com.resukisu.resukisu.ui.screen.LabelText
 import com.resukisu.resukisu.ui.theme.CardConfig.cardElevation
 import com.resukisu.resukisu.ui.theme.ThemeConfig
@@ -127,7 +126,6 @@ import kotlinx.coroutines.withContext
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun HomePage(
-    navigator: DestinationsNavigator,
     bottomPadding: Dp,
     hazeState: HazeState?
 ) {
@@ -148,13 +146,13 @@ fun HomePage(
     val topAppBarState = rememberTopAppBarState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topAppBarState)
     val scrollState = rememberScrollState()
+    val navigator = LocalNavigator.current
 
     Scaffold(
         topBar = {
             TopBar(
                 viewModel = viewModel,
                 scrollBehavior = scrollBehavior,
-                navigator = navigator,
                 hazeState = hazeState
             )
         },
@@ -200,7 +198,7 @@ fun HomePage(
                     StatusCard(
                         systemStatus = viewModel.systemStatus,
                         onClickInstall = {
-                            navigator.navigate(InstallScreenDestination(preselectedKernelUri = null))
+                            navigator.push(Route.Install(preselectedKernelUri = null))
                         }
                     )
 
@@ -343,10 +341,9 @@ fun RebootDropdownItem(@StringRes id: Int, reason: String = "") {
 private fun TopBar(
     viewModel: HomeViewModel,
     scrollBehavior: TopAppBarScrollBehavior? = null,
-    navigator: DestinationsNavigator,
     hazeState: HazeState? = null
 ) {
-    LocalContext.current
+    val navigator = LocalNavigator.current
 
     val hazeStyle = if (ThemeConfig.backgroundImageLoaded) HazeStyle(
         backgroundColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(
@@ -386,7 +383,7 @@ private fun TopBar(
                 // SuSFS 配置按钮
                 if (viewModel.systemInfo.susfsVersionSupported) {
                     IconButton(onClick = {
-                        navigator.navigate(SuSFSConfigScreenDestination)
+                        navigator.push(Route.SuSFSConfig)
                     }) {
                         Icon(
                             imageVector = Icons.Filled.Tune,

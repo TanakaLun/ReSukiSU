@@ -30,6 +30,7 @@ const SUKISU_IOCTL_DYNAMIC_MANAGER: i32 = _IOWR::<()>(K, 103);
 struct GetInfoCmd {
     version: u32,
     flags: u32,
+    features: u32,
 }
 
 #[repr(C)]
@@ -186,6 +187,7 @@ fn get_info() -> GetInfoCmd {
         let mut cmd = GetInfoCmd {
             version: 0,
             flags: 0,
+            features: 0,
         };
         let _ = ksuctl(KSU_IOCTL_GET_INFO, &raw mut cmd);
         cmd

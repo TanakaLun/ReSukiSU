@@ -7,7 +7,6 @@ import android.os.Environment
 import android.os.Parcelable
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
@@ -59,7 +58,6 @@ import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -79,16 +77,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.ramcosta.composedestinations.annotation.Destination
-import com.ramcosta.composedestinations.annotation.RootGraph
-import com.ramcosta.composedestinations.generated.destinations.FlashScreenDestination
-import com.ramcosta.composedestinations.generated.destinations.MainScreenDestination
-import com.ramcosta.composedestinations.navigation.DestinationsNavigator
-import com.ramcosta.composedestinations.navigation.EmptyDestinationsNavigator
 import com.resukisu.resukisu.R
-import com.resukisu.resukisu.ui.MainActivity
 import com.resukisu.resukisu.ui.component.KeyEventBlocker
 import com.resukisu.resukisu.ui.component.rememberCustomDialog
+import com.resukisu.resukisu.ui.navigation.LocalNavigator
+import com.resukisu.resukisu.ui.navigation.Route
 import com.resukisu.resukisu.ui.theme.CardConfig
 import com.resukisu.resukisu.ui.util.LkmSelection
 import com.resukisu.resukisu.ui.util.LocalSnackbarHost
@@ -170,8 +163,7 @@ fun updateModuleInstallStatus(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-@Destination<RootGraph>
-fun FlashScreen(navigator: DestinationsNavigator, flashIt: FlashIt) {
+fun FlashScreen(flashIt: FlashIt) {
     val context = LocalContext.current
 
     // 是否通过从外部启动的模块安装
@@ -191,6 +183,7 @@ fun FlashScreen(navigator: DestinationsNavigator, flashIt: FlashIt) {
         }
     }
 
+    val navigator = LocalNavigator.current
     var text by rememberSaveable { mutableStateOf("") }
     var tempText: String
     val logContent = rememberSaveable { StringBuilder() }
@@ -428,7 +421,7 @@ fun FlashScreen(navigator: DestinationsNavigator, flashIt: FlashIt) {
                     )
                     scope.launch {
                         kotlinx.coroutines.delay(500)
-                        navigator.navigate(FlashScreenDestination(nextFlashIt))
+                        navigator.replace(Route.Flash(nextFlashIt))
                     }
                 }
             }, onStdout = {
@@ -445,9 +438,6 @@ fun FlashScreen(navigator: DestinationsNavigator, flashIt: FlashIt) {
         }
     }
 
-    val activity = LocalActivity.current as MainActivity?
-    val pages = if (activity != null ) BottomBarDestination.getPages(activity.settingsStateFlow.collectAsState().value) else null
-
     val onBack: () -> Unit = {
         val canGoBack = when (flashIt) {
             is FlashIt.FlashModuleUpdate -> currentFlashingStatus.value != FlashingStatus.FLASHING
@@ -461,14 +451,11 @@ fun FlashScreen(navigator: DestinationsNavigator, flashIt: FlashIt) {
                 if (flashIt is FlashIt.FlashModules || flashIt is FlashIt.FlashModuleUpdate) {
                     viewModel.markNeedRefresh()
                     viewModel.fetchModuleList()
-                    pages?.forEach { destination ->
-                        if (destination != BottomBarDestination.Module) return@forEach
-                        navigator.navigate(MainScreenDestination())
-                    }
+                    navigator.replaceAll(listOf(Route.Module))
                 } else {
                     viewModel.markNeedRefresh()
                     viewModel.fetchModuleList()
-                    navigator.popBackStack()
+                    navigator.pop()
                 }
             }
         }
@@ -854,5 +841,5 @@ fun flashIt(
 @Preview
 @Composable
 fun FlashScreenPreview() {
-    FlashScreen(EmptyDestinationsNavigator, FlashIt.FlashUninstall)
+    FlashScreen(FlashIt.FlashUninstall)
 }

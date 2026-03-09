@@ -7,10 +7,6 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
@@ -34,11 +30,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.paint
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -286,7 +280,7 @@ fun KernelSUTheme(
     ) {
         MonetColorsProvider.UpdateCss()
         Box(modifier = Modifier.fillMaxSize()) {
-            BackgroundLayer(darkTheme)
+            BackgroundLayer()
             content()
         }
     }
@@ -331,11 +325,14 @@ private fun ThemeInitializer(context: Context, systemIsDark: Boolean) {
 }
 
 @Composable
-private fun BackgroundLayer(darkTheme: Boolean) {
+private fun BackgroundLayer() {
     val backgroundUri = rememberSaveable { mutableStateOf(ThemeConfig.customBackgroundUri) }
 
     LaunchedEffect(ThemeConfig.customBackgroundUri) {
         backgroundUri.value = ThemeConfig.customBackgroundUri
+        if (backgroundUri.value == null) {
+            backgroundImagePainter = null
+        }
     }
 
     // 默认背景
@@ -350,13 +347,15 @@ private fun BackgroundLayer(darkTheme: Boolean) {
 
     // 自定义背景
     backgroundUri.value?.let { uri ->
-        CustomBackgroundLayer(uri = uri, darkTheme = darkTheme)
+        CustomBackgroundLayer(uri = uri)
     }
 }
 
+var backgroundImagePainter: AsyncImagePainter? = null
+
 @Composable
-private fun CustomBackgroundLayer(uri: Uri, darkTheme: Boolean) {
-    val painter = rememberAsyncImagePainter(
+private fun CustomBackgroundLayer(uri: Uri) {
+    backgroundImagePainter = rememberAsyncImagePainter(
         model = uri,
         onError = { error ->
             Log.e("ThemeSystem", "背景加载失败: ${error.result.throwable.message}")
@@ -369,45 +368,27 @@ private fun CustomBackgroundLayer(uri: Uri, darkTheme: Boolean) {
         }
     )
 
-    val transition = updateTransition(
-        targetState = ThemeConfig.backgroundImageLoaded,
-        label = "backgroundTransition"
-    )
-
-    val alpha by transition.animateFloat(
-        label = "backgroundAlpha",
-        transitionSpec = {
-            spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessMedium
-            )
-        }
-    ) { loaded -> if (loaded) 1f else 0f }
-
     Box(
         modifier = Modifier
             .fillMaxSize()
             .zIndex(-1f)
-            .alpha(alpha)
     ) {
-        val surfaceContainer = MaterialTheme.colorScheme.surfaceContainer
-        // 背景图片
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .paint(
-                    painter = painter,
-                    contentScale = ContentScale.Crop,
-                )
-                .graphicsLayer {
-                    this.alpha =
-                        (painter.state as? AsyncImagePainter.State.Success)?.let { 1f } ?: 0f
-                }
-                .drawWithContent {
-                    drawContent()
-                    drawRect(color = surfaceContainer.copy(alpha = ThemeConfig.backgroundDim))
-                }
-        )
+        backgroundImagePainter?.let { painter ->
+            val surfaceContainer = MaterialTheme.colorScheme.surfaceContainer
+            // 背景图片
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .paint(
+                        painter = painter,
+                        contentScale = ContentScale.Crop,
+                    )
+                    .drawWithContent {
+                        drawContent()
+                        drawRect(color = surfaceContainer.copy(alpha = ThemeConfig.backgroundDim))
+                    }
+            )
+        }
     }
 }
 

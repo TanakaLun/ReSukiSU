@@ -39,11 +39,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
-import com.ramcosta.composedestinations.annotation.Destination
-import com.ramcosta.composedestinations.annotation.RootGraph
-import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import com.resukisu.resukisu.R
 import com.resukisu.resukisu.ui.component.KeyEventBlocker
+import com.resukisu.resukisu.ui.navigation.LocalNavigator
 import com.resukisu.resukisu.ui.util.LocalSnackbarHost
 import com.resukisu.resukisu.ui.util.runModuleAction
 import kotlinx.coroutines.Dispatchers
@@ -56,8 +54,7 @@ import java.util.Locale
 
 @SuppressLint("LocalContextGetResourceValueCall")
 @Composable
-@Destination<RootGraph>
-fun ExecuteModuleActionScreen(navigator: DestinationsNavigator, moduleId: String) {
+fun ExecuteModuleActionScreen(moduleId: String) {
     var text by rememberSaveable { mutableStateOf("") }
     var tempText : String
     val logContent = rememberSaveable { StringBuilder() }
@@ -135,11 +132,12 @@ fun ExecuteModuleActionScreen(navigator: DestinationsNavigator, moduleId: String
         },
         floatingActionButton = {
             if (!isActionRunning) {
+                val navigator = LocalNavigator.current
                 ExtendedFloatingActionButton(
                     text = { Text(text = stringResource(R.string.close)) },
                     icon = { Icon(Icons.Filled.Close, contentDescription = null) },
                     onClick = {
-                        navigator.popBackStack()
+                        navigator.pop()
                     }
                 )
             }

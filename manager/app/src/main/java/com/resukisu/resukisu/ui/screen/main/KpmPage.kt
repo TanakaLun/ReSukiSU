@@ -50,6 +50,8 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -74,7 +76,6 @@ import com.resukisu.resukisu.ui.component.AnimatedFab
 import com.resukisu.resukisu.ui.component.ConfirmDialogHandle
 import com.resukisu.resukisu.ui.component.ConfirmResult
 import com.resukisu.resukisu.ui.component.SearchAppBar
-import com.resukisu.resukisu.ui.component.pinnedScrollBehavior
 import com.resukisu.resukisu.ui.component.rememberConfirmDialog
 import com.resukisu.resukisu.ui.component.rememberCustomDialog
 import com.resukisu.resukisu.ui.component.rememberFabVisibilityState
@@ -113,7 +114,8 @@ fun KpmPage(bottomPadding: Dp, hazeState: HazeState?) {
         module.id to stringResource(R.string.confirm_uninstall_content, moduleFileName)
     }
 
-    val scrollBehavior = pinnedScrollBehavior()
+    val topAppBarState = rememberTopAppBarState()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topAppBarState)
 
     val kpmInstallSuccess = stringResource(R.string.kpm_install_success)
     val kpmInstallFailed = stringResource(R.string.kpm_install_failed)
@@ -316,6 +318,7 @@ fun KpmPage(bottomPadding: Dp, hazeState: HazeState?) {
     Scaffold(
         topBar = {
             SearchAppBar(
+                title = stringResource(R.string.kpm_title),
                 searchText = viewModel.search,
                 onSearchTextChange = { viewModel.search = it },
                 scrollBehavior = scrollBehavior,

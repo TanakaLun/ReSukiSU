@@ -82,18 +82,14 @@ import com.maxkeppeker.sheets.core.models.base.rememberUseCaseState
 import com.maxkeppeler.sheets.list.ListDialog
 import com.maxkeppeler.sheets.list.models.ListOption
 import com.maxkeppeler.sheets.list.models.ListSelection
-import com.ramcosta.composedestinations.annotation.Destination
-import com.ramcosta.composedestinations.annotation.RootGraph
-import com.ramcosta.composedestinations.generated.destinations.FlashScreenDestination
-import com.ramcosta.composedestinations.generated.destinations.KernelFlashScreenDestination
-import com.ramcosta.composedestinations.navigation.DestinationsNavigator
-import com.ramcosta.composedestinations.navigation.EmptyDestinationsNavigator
 import com.resukisu.resukisu.R
 import com.resukisu.resukisu.getKernelVersion
 import com.resukisu.resukisu.ui.component.DialogHandle
 import com.resukisu.resukisu.ui.component.rememberConfirmDialog
 import com.resukisu.resukisu.ui.component.rememberCustomDialog
 import com.resukisu.resukisu.ui.component.settings.SettingsDropdownWidget
+import com.resukisu.resukisu.ui.navigation.LocalNavigator
+import com.resukisu.resukisu.ui.navigation.Route
 import com.resukisu.resukisu.ui.theme.CardConfig
 import com.resukisu.resukisu.ui.theme.CardConfig.cardAlpha
 import com.resukisu.resukisu.ui.theme.getCardColors
@@ -120,10 +116,8 @@ enum class KpmPatchOption {
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
-@Destination<RootGraph>
 @Composable
 fun InstallScreen(
-    navigator: DestinationsNavigator,
     preselectedKernelUri: String? = null
 ) {
     val context = LocalContext.current
@@ -187,14 +181,15 @@ fun InstallScreen(
     var partitionSelectionIndex by remember { mutableIntStateOf(0) }
     var partitionsState by remember { mutableStateOf<List<String>>(emptyList()) }
     var hasCustomSelected by remember { mutableStateOf(false) }
+    val navigator = LocalNavigator.current
 
     val onInstall = {
         installMethod?.let { method ->
             when (method) {
                 is InstallMethod.HorizonKernel -> {
                     method.uri?.let { uri ->
-                        navigator.navigate(
-                            KernelFlashScreenDestination(
+                        navigator.push(
+                            Route.KernelFlash(
                                 kernelUri = uri,
                                 selectedSlot = method.slot,
                                 kpmPatchEnabled = kpmPatchOption == KpmPatchOption.PATCH_KPM,
@@ -212,7 +207,7 @@ fun InstallScreen(
                         ota = isOta,
                         partition = partitionSelection
                     )
-                    navigator.navigate(FlashScreenDestination(flashIt))
+                    navigator.push(Route.Flash(flashIt))
                 }
             }
         }
@@ -267,6 +262,7 @@ fun InstallScreen(
         }
     }
 
+    val installOnlySupportKoFile = stringResource(R.string.install_only_support_ko_file)
     val selectLkmLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) {
@@ -279,7 +275,7 @@ fun InstallScreen(
                     lkmSelection = LkmSelection.KmiNone
                     Toast.makeText(
                         context,
-                        context.getString(R.string.install_only_support_ko_file),
+                        installOnlySupportKoFile,
                         Toast.LENGTH_SHORT
                     ).show()
                 }
@@ -298,7 +294,7 @@ fun InstallScreen(
     Scaffold(
         topBar = {
             TopBar(
-                onBack = { navigator.popBackStack() },
+                onBack = { navigator.pop() },
                 scrollBehavior = scrollBehavior
             )
         },
@@ -1138,5 +1134,5 @@ private fun isKoFile(context: Context, uri: Uri): Boolean {
 @Preview
 @Composable
 fun SelectInstallPreview() {
-    InstallScreen(EmptyDestinationsNavigator)
+    InstallScreen()
 }

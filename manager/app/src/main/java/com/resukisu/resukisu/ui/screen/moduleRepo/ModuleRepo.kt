@@ -56,10 +56,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
@@ -86,21 +88,17 @@ import androidx.compose.ui.window.Dialog
 import androidx.core.content.edit
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.ramcosta.composedestinations.annotation.Destination
-import com.ramcosta.composedestinations.annotation.RootGraph
-import com.ramcosta.composedestinations.generated.destinations.FlashScreenDestination
-import com.ramcosta.composedestinations.generated.destinations.OnlineModuleDetailScreenDestination
-import com.ramcosta.composedestinations.navigation.DestinationsNavigator
-import com.ramcosta.composedestinations.navigation.EmptyDestinationsNavigator
 import com.resukisu.resukisu.R
 import com.resukisu.resukisu.ui.activity.util.isNetworkAvailable
 import com.resukisu.resukisu.ui.component.ConfirmDialogHandle
 import com.resukisu.resukisu.ui.component.ConfirmResult
 import com.resukisu.resukisu.ui.component.DialogHandle
 import com.resukisu.resukisu.ui.component.SearchAppBar
-import com.resukisu.resukisu.ui.component.pinnedScrollBehavior
 import com.resukisu.resukisu.ui.component.rememberConfirmDialog
 import com.resukisu.resukisu.ui.component.rememberCustomDialog
+import com.resukisu.resukisu.ui.navigation.LocalNavigator
+import com.resukisu.resukisu.ui.navigation.Navigator
+import com.resukisu.resukisu.ui.navigation.Route
 import com.resukisu.resukisu.ui.screen.FlashIt
 import com.resukisu.resukisu.ui.screen.LabelText
 import com.resukisu.resukisu.ui.theme.ThemeConfig
@@ -125,17 +123,18 @@ import kotlinx.coroutines.withContext
  * @date 2025/12/6
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
-@Destination<RootGraph>
 @Composable
-fun ModuleRepoScreen(navigator: DestinationsNavigator) {
+fun ModuleRepoScreen() {
+    val navigator = LocalNavigator.current
     val context = LocalContext.current
     val prefs = context.getSharedPreferences("settings", MODE_PRIVATE)
     val viewModel = viewModel<ModuleRepoViewModel>()
     val snackBarHost = LocalSnackbarHost.current
-    val scrollBehavior = pinnedScrollBehavior()
+    val topAppBarState = rememberTopAppBarState()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topAppBarState)
     val currentModuleForChooseDialog = remember { mutableStateOf<RepoModule?>(null) }
     val chooseDialog = rememberCustomDialog({ dismiss ->
-        ChooseDialogContent(currentModuleForChooseDialog, navigator, viewModel,dismiss)
+        ChooseDialogContent(currentModuleForChooseDialog, viewModel, dismiss)
     })
     val confirmDialog = rememberConfirmDialog()
     val bottomSheetState = rememberModalBottomSheetState(
@@ -146,6 +145,8 @@ fun ModuleRepoScreen(navigator: DestinationsNavigator) {
     val pullRefreshState = rememberPullToRefreshState()
 
     LaunchedEffect(Unit) {
+        scrollBehavior.state.heightOffset = scrollBehavior.state.heightOffsetLimit
+
         viewModel.sortStargazerCountFirst = prefs.getBoolean("module_repo_sort_star_first", false)
     }
 
@@ -158,6 +159,7 @@ fun ModuleRepoScreen(navigator: DestinationsNavigator) {
                 modifier = if (isLoading) Modifier.background(MaterialTheme.colorScheme.surfaceContainer.copy(
                     alpha = 0.8f
                 )) else Modifier,
+                title = stringResource(R.string.module_repo),
                 searchText = viewModel.search,
                 onSearchTextChange = { viewModel.search = it },
                 dropdownContent = {
@@ -171,7 +173,7 @@ fun ModuleRepoScreen(navigator: DestinationsNavigator) {
                     }
                 },
                 onBackClick = {
-                    navigator.popBackStack()
+                    navigator.pop()
                 },
                 scrollBehavior = scrollBehavior,
                 searchBarPlaceHolderText = stringResource(R.string.search_modules),
@@ -251,28 +253,37 @@ fun ModuleRepoScreen(navigator: DestinationsNavigator) {
                     PullToRefreshDefaults.LoadingIndicator(
                         state = pullRefreshState,
                         isRefreshing = viewModel.isRefreshing,
-                        modifier = Modifier.padding(top = innerPadding.calculateTopPadding()).align(Alignment.TopCenter),
+                        modifier = Modifier
+                            .padding(top = innerPadding.calculateTopPadding())
+                            .align(Alignment.TopCenter),
                     )
                 }
             ) {
                 LazyColumn(
                     state = rememberLazyListState(),
                     modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
                     contentPadding = remember {
                         PaddingValues(
                             start = 16.dp,
-                            top = 16.dp,
+                            top = 0.dp,
                             end = 16.dp,
-                            bottom = 16.dp + 56.dp + 16.dp + 48.dp + 6.dp /* Scaffold Fab Spacing + Fab container height + SnackBar height */
+                            bottom = 0.dp
                         )
                     }
                 ) {
                     item {
                         Spacer(modifier = Modifier.height(innerPadding.calculateTopPadding()))
                     }
+
                     items(viewModel.modules) { module ->
-                        OnlineModuleItem(navigator, module, viewModel, confirmDialog, chooseDialog, currentModuleForChooseDialog)
+                        OnlineModuleItem(
+                            module,
+                            viewModel,
+                            confirmDialog,
+                            chooseDialog,
+                            currentModuleForChooseDialog
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
                     }
                     item {
                         Spacer(modifier = Modifier.height(innerPadding.calculateBottomPadding()))
@@ -378,7 +389,6 @@ private fun ModuleRepoBottomSheetContent(
 
 @Composable
 fun OnlineModuleItem(
-    navigator: DestinationsNavigator,
     module: RepoModule,
     viewModel: ModuleRepoViewModel,
     confirmDialog: ConfirmDialogHandle,
@@ -386,12 +396,15 @@ fun OnlineModuleItem(
     currentModuleForChooseDialog: MutableState<RepoModule?>
 ) {
     val context = LocalContext.current
+    val navigator = LocalNavigator.current
 
     ElevatedCard(
         colors = getCardColors(MaterialTheme.colorScheme.surfaceContainerHighest),
-        modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable {
-            navigator.navigate(OnlineModuleDetailScreenDestination(module))
-        },
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .clickable {
+                navigator.push(Route.ModuleRepoDetail(module))
+            },
         elevation = getCardElevation(),
     ) {
         Column(
@@ -417,7 +430,9 @@ fun OnlineModuleItem(
                             text = module.moduleName,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+                            modifier = Modifier
+                                .weight(1f)
+                                .horizontalScroll(rememberScrollState()),
                             softWrap = true,
                             maxLines = 1
                         )
@@ -509,7 +524,7 @@ fun OnlineModuleItem(
                     FilledTonalButton(
                         modifier = Modifier.defaultMinSize(minWidth = 52.dp, minHeight = 32.dp),
                         onClick = {
-                            navigator.navigate(OnlineModuleDetailScreenDestination(module))
+                            navigator.push(Route.ModuleRepoDetail(module))
                         },
                         contentPadding = ButtonDefaults.TextButtonContentPadding,
                     ) {
@@ -572,7 +587,7 @@ fun downloadAssetAndInstall(
     context: Context,
     module: RepoModule,
     asset: ReleaseAssetInfo,
-    navigator: DestinationsNavigator,
+    navigator: Navigator,
     coroutineScope: CoroutineScope
 ) {
     val downloadingText = context.getText(R.string.module_downloading).toString()
@@ -585,8 +600,8 @@ fun downloadAssetAndInstall(
                 asset.name,
                 downloadingText.format(module.moduleName),
                 onDownloaded = { uri ->
-                    navigator.navigate(
-                        FlashScreenDestination(
+                    navigator.push(
+                        Route.Flash(
                             FlashIt.FlashModule(uri)
                         )
                     )
@@ -610,10 +625,10 @@ fun downloadAssetAndInstall(
 @Composable
 fun ChooseDialogContent(
     currentModuleForChooseDialog: MutableState<RepoModule?>,
-    navigator: DestinationsNavigator,
     viewModel: ModuleRepoViewModel,
     dismiss: () -> Unit
 ) {
+    val navigator = LocalNavigator.current
     val context = LocalContext.current
     val module = currentModuleForChooseDialog.value
     if (module == null || module.latestAsset == null) {
@@ -770,7 +785,6 @@ fun OnlineModuleItemPreview() {
     val currentModuleForChooseDialog = remember { mutableStateOf<RepoModule?>(null) }
 
     OnlineModuleItem(
-        EmptyDestinationsNavigator,
         initFakeRepoModuleForPreview(),
         viewModel<ModuleRepoViewModel>(),
         rememberConfirmDialog(),
@@ -784,5 +798,5 @@ fun OnlineModuleItemPreview() {
 fun ChooseDialogPreview() {
     val currentModuleForChooseDialog = remember { mutableStateOf<RepoModule?>(initFakeRepoModuleForPreview()) }
 
-    ChooseDialogContent(currentModuleForChooseDialog, EmptyDestinationsNavigator, viewModel<ModuleRepoViewModel>()) {}
+    ChooseDialogContent(currentModuleForChooseDialog, viewModel<ModuleRepoViewModel>()) {}
 }

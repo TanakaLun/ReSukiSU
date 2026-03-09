@@ -1,5 +1,6 @@
 package com.resukisu.resukisu.ui.screen.main
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -82,16 +83,9 @@ import androidx.core.content.FileProvider
 import androidx.core.content.edit
 import com.maxkeppeker.sheets.core.models.base.IconSource
 import com.maxkeppeler.sheets.list.models.ListOption
-import com.ramcosta.composedestinations.generated.destinations.AppProfileTemplateScreenDestination
-import com.ramcosta.composedestinations.generated.destinations.FlashScreenDestination
-import com.ramcosta.composedestinations.generated.destinations.LogViewerScreenDestination
-import com.ramcosta.composedestinations.generated.destinations.MoreSettingsScreenDestination
-import com.ramcosta.composedestinations.generated.destinations.UmountManagerScreenDestination
-import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import com.resukisu.resukisu.BuildConfig
 import com.resukisu.resukisu.Natives
 import com.resukisu.resukisu.R
-import com.resukisu.resukisu.ui.component.AboutDialog
 import com.resukisu.resukisu.ui.component.ConfirmResult
 import com.resukisu.resukisu.ui.component.DialogHandle
 import com.resukisu.resukisu.ui.component.ksuIsValid
@@ -103,6 +97,8 @@ import com.resukisu.resukisu.ui.component.settings.SettingsDropdownWidget
 import com.resukisu.resukisu.ui.component.settings.SettingsJumpPageWidget
 import com.resukisu.resukisu.ui.component.settings.SettingsSwitchWidget
 import com.resukisu.resukisu.ui.component.settings.SplicedColumnGroup
+import com.resukisu.resukisu.ui.navigation.LocalNavigator
+import com.resukisu.resukisu.ui.navigation.Route
 import com.resukisu.resukisu.ui.screen.FlashIt
 import com.resukisu.resukisu.ui.theme.ThemeConfig
 import com.resukisu.resukisu.ui.util.LocalSnackbarHost
@@ -129,7 +125,8 @@ private val SPACING_LARGE = 16.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsPage(navigator: DestinationsNavigator, bottomPadding: Dp, hazeState: HazeState?) {
+fun SettingsPage(bottomPadding: Dp, hazeState: HazeState?) {
+    val navigator = LocalNavigator.current
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
     val snackBarHost = LocalSnackbarHost.current
     val context = LocalContext.current
@@ -150,9 +147,6 @@ fun SettingsPage(navigator: DestinationsNavigator, bottomPadding: Dp, hazeState:
         contentColor = MaterialTheme.colorScheme.onSurface,
         contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)
     ) { innerPadding ->
-        val aboutDialog = rememberCustomDialog {
-            AboutDialog(it)
-        }
         val loadingDialog = rememberLoadingDialog()
         var showBottomsheet by remember { mutableStateOf(false) }
         val logSaved = stringResource(R.string.log_saved)
@@ -212,7 +206,7 @@ fun SettingsPage(navigator: DestinationsNavigator, bottomPadding: Dp, hazeState:
                                     title = stringResource(R.string.settings_profile_template),
                                     description = stringResource(R.string.settings_profile_template_summary),
                                     onClick = {
-                                        navigator.navigate(AppProfileTemplateScreenDestination)
+                                        navigator.push(Route.AppProfileTemplate)
                                     }
                                 )
                             }
@@ -423,7 +417,7 @@ fun SettingsPage(navigator: DestinationsNavigator, bottomPadding: Dp, hazeState:
                                 title = stringResource(R.string.more_settings),
                                 description = stringResource(R.string.more_settings),
                                 onClick = {
-                                    navigator.navigate(MoreSettingsScreenDestination)
+                                    navigator.push(Route.MoreSettings)
                                 }
                             )
                         }
@@ -454,7 +448,7 @@ fun SettingsPage(navigator: DestinationsNavigator, bottomPadding: Dp, hazeState:
                                     title = stringResource(R.string.log_viewer_view_logs),
                                     description = stringResource(R.string.log_viewer_view_logs_summary),
                                     onClick = {
-                                        navigator.navigate(LogViewerScreenDestination)
+                                        navigator.push(Route.LogViewer)
                                     }
                                 )
                             }
@@ -467,7 +461,7 @@ fun SettingsPage(navigator: DestinationsNavigator, bottomPadding: Dp, hazeState:
                                     title = stringResource(R.string.umount_path_manager),
                                     description = stringResource(R.string.umount_path_manager_summary),
                                     onClick = {
-                                        navigator.navigate(UmountManagerScreenDestination)
+                                        navigator.push(Route.UmountManager)
                                     }
                                 )
                             }
@@ -475,7 +469,7 @@ fun SettingsPage(navigator: DestinationsNavigator, bottomPadding: Dp, hazeState:
 
                         if (Natives.isLkmMode) {
                             item {
-                                UninstallItem(navigator) {
+                                UninstallItem {
                                     loadingDialog.withLoading(it)
                                 }
                             }
@@ -486,6 +480,7 @@ fun SettingsPage(navigator: DestinationsNavigator, bottomPadding: Dp, hazeState:
 
             if (showBottomsheet) {
                 item {
+                    val sendLog = stringResource(R.string.send_log)
                     LogBottomSheet(
                         onDismiss = { showBottomsheet = false },
                         onSaveLog = {
@@ -517,7 +512,7 @@ fun SettingsPage(navigator: DestinationsNavigator, bottomPadding: Dp, hazeState:
                                 context.startActivity(
                                     Intent.createChooser(
                                         shareIntent,
-                                        context.getString(R.string.send_log)
+                                        sendLog
                                     )
                                 )
 
@@ -534,13 +529,13 @@ fun SettingsPage(navigator: DestinationsNavigator, bottomPadding: Dp, hazeState:
                     title = stringResource(R.string.about),
                     content = {
                         item {
-                            SettingsBaseWidget(
+                            SettingsJumpPageWidget(
                                 icon = Icons.Filled.Info,
                                 title = stringResource(R.string.about),
                                 onClick = {
-                                    aboutDialog.show()
+                                    navigator.push(Route.About)
                                 }
-                            ) {}
+                            )
                         }
                     }
                 )
@@ -616,11 +611,12 @@ fun LogActionButton(
     }
 }
 
+@SuppressLint("LocalContextGetResourceValueCall")
 @Composable
 fun UninstallItem(
-    navigator: DestinationsNavigator,
     withLoading: suspend (suspend () -> Unit) -> Unit
 ) {
+    val navigator = LocalNavigator.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val uninstallConfirmDialog = rememberConfirmDialog()
@@ -637,12 +633,8 @@ fun UninstallItem(
                 withLoading {
                     when (uninstallType) {
                         UninstallType.TEMPORARY -> showTodo()
-                        UninstallType.PERMANENT -> navigator.navigate(
-                            FlashScreenDestination(FlashIt.FlashUninstall)
-                        )
-                        UninstallType.RESTORE_STOCK_IMAGE -> navigator.navigate(
-                            FlashScreenDestination(FlashIt.FlashRestore)
-                        )
+                        UninstallType.PERMANENT -> navigator.push(Route.Flash(FlashIt.FlashUninstall))
+                        UninstallType.RESTORE_STOCK_IMAGE -> navigator.push(Route.Flash(FlashIt.FlashRestore))
                         UninstallType.NONE -> Unit
                     }
                 }
@@ -696,121 +688,115 @@ fun rememberUninstallDialog(onSelected: (UninstallType) -> Unit): DialogHandle {
 
         var selectedOption by remember { mutableStateOf<UninstallType?>(null) }
 
-        MaterialTheme(
-            colorScheme = MaterialTheme.colorScheme.copy(
-                surface = MaterialTheme.colorScheme.surfaceContainerHigh
-            )
-        ) {
-            AlertDialog(
-                onDismissRequest = {
-                    dismiss()
-                },
-                title = {
-                    Text(
-                        text = stringResource(R.string.settings_uninstall),
-                        style = MaterialTheme.typography.headlineSmall,
-                    )
-                },
-                text = {
-                    Column(
-                        modifier = Modifier.padding(vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        options.forEachIndexed { index, option ->
-                            val isSelected = selectedOption == option
-                            val backgroundColor = if (isSelected)
-                                MaterialTheme.colorScheme.primaryContainer
-                            else
-                                Color.Transparent
-                            val contentColor = if (isSelected)
-                                MaterialTheme.colorScheme.onPrimaryContainer
-                            else
-                                MaterialTheme.colorScheme.onSurface
+        AlertDialog(
+            onDismissRequest = {
+                dismiss()
+            },
+            title = {
+                Text(
+                    text = stringResource(R.string.settings_uninstall),
+                    style = MaterialTheme.typography.headlineSmall,
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.padding(vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    options.forEachIndexed { index, option ->
+                        val isSelected = selectedOption == option
+                        val backgroundColor = if (isSelected)
+                            MaterialTheme.colorScheme.primaryContainer
+                        else
+                            Color.Transparent
+                        val contentColor = if (isSelected)
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        else
+                            MaterialTheme.colorScheme.onSurface
 
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(MaterialTheme.shapes.medium)
-                                    .background(backgroundColor)
-                                    .clickable {
-                                        selectedOption = option
-                                    }
-                                    .padding(vertical = 12.dp, horizontal = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = option.icon,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier
-                                        .padding(end = 16.dp)
-                                        .size(24.dp)
-                                )
-                                Column(
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text(
-                                        text = listOptions[index].titleText,
-                                        style = MaterialTheme.typography.titleMedium,
-                                    )
-                                    listOptions[index].subtitleText?.let {
-                                        Text(
-                                            text = it,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = if (isSelected)
-                                                contentColor.copy(alpha = 0.8f)
-                                            else
-                                                MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(MaterialTheme.shapes.medium)
+                                .background(backgroundColor)
+                                .clickable {
+                                    selectedOption = option
                                 }
-                                if (isSelected) {
-                                    Icon(
-                                        imageVector = Icons.Default.RadioButtonChecked,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                } else {
-                                    Icon(
-                                        imageVector = Icons.Default.RadioButtonUnchecked,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(24.dp)
+                                .padding(vertical = 12.dp, horizontal = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = option.icon,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .padding(end = 16.dp)
+                                    .size(24.dp)
+                            )
+                            Column(
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    text = listOptions[index].titleText,
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                                listOptions[index].subtitleText?.let {
+                                    Text(
+                                        text = it,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = if (isSelected)
+                                            contentColor.copy(alpha = 0.8f)
+                                        else
+                                            MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
+                            if (isSelected) {
+                                Icon(
+                                    imageVector = Icons.Default.RadioButtonChecked,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.RadioButtonUnchecked,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
                         }
                     }
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            selectedOption?.let { onSelected(it) }
-                            dismiss()
-                        },
-                        enabled = selectedOption != null,
-                    ) {
-                        Text(
-                            text = stringResource(android.R.string.ok)
-                        )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        selectedOption?.let { onSelected(it) }
+                        dismiss()
+                    },
+                    enabled = selectedOption != null,
+                ) {
+                    Text(
+                        text = stringResource(android.R.string.ok)
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        dismiss()
                     }
-                },
-                dismissButton = {
-                    TextButton(
-                        onClick = {
-                            dismiss()
-                        }
-                    ) {
-                        Text(
-                            text = stringResource(android.R.string.cancel),
-                        )
-                    }
-                },
-                shape = MaterialTheme.shapes.extraLarge,
-                tonalElevation = 4.dp
-            )
-        }
+                ) {
+                    Text(
+                        text = stringResource(android.R.string.cancel),
+                    )
+                }
+            },
+            shape = MaterialTheme.shapes.extraLarge,
+            tonalElevation = 4.dp
+        )
     }
 }
 

@@ -54,9 +54,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.ramcosta.composedestinations.annotation.Destination
-import com.ramcosta.composedestinations.annotation.RootGraph
-import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import com.resukisu.resukisu.R
 import com.resukisu.resukisu.ui.component.ConfirmResult
 import com.resukisu.resukisu.ui.component.WarningCard
@@ -64,6 +61,7 @@ import com.resukisu.resukisu.ui.component.rememberConfirmDialog
 import com.resukisu.resukisu.ui.component.settings.AppBackButton
 import com.resukisu.resukisu.ui.component.settings.SettingsBaseWidget
 import com.resukisu.resukisu.ui.component.settings.splicedLazyColumnGroup
+import com.resukisu.resukisu.ui.navigation.LocalNavigator
 import com.resukisu.resukisu.ui.theme.ThemeConfig
 import com.resukisu.resukisu.ui.util.LocalSnackbarHost
 import com.resukisu.resukisu.ui.viewmodel.UmountManagerScreenViewModel
@@ -77,9 +75,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
-@Destination<RootGraph>
 @Composable
-fun UmountManagerScreen(navigator: DestinationsNavigator) {
+fun UmountManagerScreen() {
     val viewModel = viewModel<UmountManagerScreenViewModel>()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
     val snackBarHost = LocalSnackbarHost.current
@@ -124,9 +121,10 @@ fun UmountManagerScreen(navigator: DestinationsNavigator) {
                 modifier = modifier,
                 title = { Text(stringResource(R.string.umount_path_manager)) },
                 navigationIcon = {
+                    val navigator = LocalNavigator.current
                     AppBackButton(
                         onClick = {
-                            navigator.popBackStack()
+                            navigator.pop()
                         }
                     )
                 },

@@ -43,6 +43,7 @@ import androidx.compose.material3.TopAppBarColors
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -64,11 +65,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.dropUnlessResumed
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.ramcosta.composedestinations.annotation.Destination
-import com.ramcosta.composedestinations.annotation.RootGraph
-import com.ramcosta.composedestinations.generated.destinations.AppProfileTemplateScreenDestination
-import com.ramcosta.composedestinations.generated.destinations.TemplateEditorScreenDestination
-import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import com.resukisu.resukisu.Natives
 import com.resukisu.resukisu.R
 import com.resukisu.resukisu.ui.component.profile.AppProfileConfig
@@ -78,6 +74,8 @@ import com.resukisu.resukisu.ui.component.settings.AppBackButton
 import com.resukisu.resukisu.ui.component.settings.SettingsBaseWidget
 import com.resukisu.resukisu.ui.component.settings.SettingsSwitchWidget
 import com.resukisu.resukisu.ui.component.settings.SplicedColumnGroup
+import com.resukisu.resukisu.ui.navigation.LocalNavigator
+import com.resukisu.resukisu.ui.navigation.Route
 import com.resukisu.resukisu.ui.theme.CardConfig
 import com.resukisu.resukisu.ui.theme.ThemeConfig
 import com.resukisu.resukisu.ui.util.LocalSnackbarHost
@@ -101,12 +99,11 @@ import kotlinx.coroutines.launch
  * @date 2023/5/16.
  */
 @OptIn(ExperimentalMaterial3Api::class)
-@Destination<RootGraph>
 @Composable
 fun AppProfileScreen(
-    navigator: DestinationsNavigator,
     appGroup: SuperUserViewModel.AppGroup,
 ) {
+    val navigator = LocalNavigator.current
     val context = LocalContext.current
     val snackBarHost = LocalSnackbarHost.current
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
@@ -136,6 +133,10 @@ fun AppProfileScreen(
 
     val hazeState = if (CardConfig.isCustomBackgroundEnabled) rememberHazeState() else null
 
+    LaunchedEffect(Unit) {
+        scrollBehavior.state.heightOffset = scrollBehavior.state.heightOffsetLimit
+    }
+    
     Scaffold(
         topBar = {
             TopBar(
@@ -145,7 +146,7 @@ fun AppProfileScreen(
                     containerColor = cardColor,
                     scrolledContainerColor = cardColor
                 ),
-                onBack = dropUnlessResumed { navigator.popBackStack() },
+                onBack = dropUnlessResumed { navigator.pop() },
                 scrollBehavior = scrollBehavior,
                 hazeState = hazeState
             )
@@ -175,11 +176,11 @@ fun AppProfileScreen(
             profile = profile,
             onViewTemplate = {
                 getTemplateInfoById(it)?.let { info ->
-                    navigator.navigate(TemplateEditorScreenDestination(info))
+                    navigator.push(Route.TemplateEditor(info, true))
                 }
             },
             onManageTemplate = {
-                navigator.navigate(AppProfileTemplateScreenDestination())
+                navigator.push(Route.AppProfileTemplate)
             },
             onProfileChange = {
                 scope.launch {

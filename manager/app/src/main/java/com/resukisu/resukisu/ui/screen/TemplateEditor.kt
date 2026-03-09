@@ -45,15 +45,13 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.dropUnlessResumed
-import com.ramcosta.composedestinations.annotation.Destination
-import com.ramcosta.composedestinations.annotation.RootGraph
-import com.ramcosta.composedestinations.result.ResultBackNavigator
 import com.resukisu.resukisu.Natives
 import com.resukisu.resukisu.R
 import com.resukisu.resukisu.ui.component.profile.rootProfileConfig
 import com.resukisu.resukisu.ui.component.settings.AppBackButton
 import com.resukisu.resukisu.ui.component.settings.SettingsTextFieldWidget
 import com.resukisu.resukisu.ui.component.settings.SplicedColumnGroup
+import com.resukisu.resukisu.ui.navigation.LocalNavigator
 import com.resukisu.resukisu.ui.util.deleteAppProfileTemplate
 import com.resukisu.resukisu.ui.util.getAppProfileTemplate
 import com.resukisu.resukisu.ui.util.setAppProfileTemplate
@@ -65,14 +63,12 @@ import com.resukisu.resukisu.ui.viewmodel.toJSON
  * @date 2023/10/20.
  */
 @OptIn(ExperimentalComposeUiApi::class, ExperimentalMaterial3Api::class)
-@Destination<RootGraph>
 @Composable
 fun TemplateEditorScreen(
-    navigator: ResultBackNavigator<Boolean>,
     initialTemplate: TemplateViewModel.TemplateInfo,
     readOnly: Boolean = true,
 ) {
-
+    val navigator = LocalNavigator.current
     val isCreation = initialTemplate.id.isBlank()
     val autoSave = !isCreation
 
@@ -82,6 +78,10 @@ fun TemplateEditorScreen(
 
     val scrollBehavior =
         TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
+
+    LaunchedEffect(Unit) {
+        scrollBehavior.state.heightOffset = scrollBehavior.state.heightOffsetLimit
+    }
 
     Scaffold(
         topBar = {
@@ -106,15 +106,17 @@ fun TemplateEditorScreen(
                 },
                 readOnly = readOnly,
                 summary = titleSummary,
-                onBack = dropUnlessResumed { navigator.navigateBack(result = !readOnly) },
+                onBack = dropUnlessResumed {
+                    if (readOnly) navigator.pop() else navigator.setResult("template_edit", true)
+                },
                 onDelete = {
                     if (deleteAppProfileTemplate(template.id)) {
-                        navigator.navigateBack(result = true)
+                        navigator.setResult("template_edit", true)
                     }
                 },
                 onSave = {
                     if (saveTemplate(template, isCreation)) {
-                        navigator.navigateBack(result = true)
+                        navigator.setResult("template_edit", true)
                     } else {
                         Toast.makeText(context, saveTemplateFailed, Toast.LENGTH_SHORT).show()
                     }
@@ -149,7 +151,6 @@ fun TemplateEditorScreen(
                             label = stringResource(id = R.string.app_profile_template_id),
                             text = template.id,
                             errorHint = errorHint,
-                            isError = errorHint.isNotEmpty()
                         ) { value ->
                             errorHint = if (isTemplateExist(value)) {
                                 idConflictError
@@ -318,7 +319,6 @@ private fun TextEdit(
     label: String,
     text: String,
     errorHint: String = "",
-    isError: Boolean = false,
     onValueChange: (String) -> Unit = {}
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
