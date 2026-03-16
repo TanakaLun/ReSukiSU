@@ -1,9 +1,12 @@
 package com.resukisu.resukisu.ui.screen.main
 
 import android.annotation.SuppressLint
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -42,6 +45,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Update
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.rounded.ElectricalServices
 import androidx.compose.material.icons.rounded.FolderDelete
 import androidx.compose.material.icons.rounded.RemoveCircle
 import androidx.compose.material.icons.rounded.RemoveModerator
@@ -86,6 +90,8 @@ import com.maxkeppeler.sheets.list.models.ListOption
 import com.resukisu.resukisu.BuildConfig
 import com.resukisu.resukisu.Natives
 import com.resukisu.resukisu.R
+import com.resukisu.resukisu.ksuApp
+import com.resukisu.resukisu.magica.BootCompletedReceiver
 import com.resukisu.resukisu.ui.component.ConfirmResult
 import com.resukisu.resukisu.ui.component.DialogHandle
 import com.resukisu.resukisu.ui.component.ksuIsValid
@@ -101,15 +107,14 @@ import com.resukisu.resukisu.ui.navigation.LocalNavigator
 import com.resukisu.resukisu.ui.navigation.Route
 import com.resukisu.resukisu.ui.screen.FlashIt
 import com.resukisu.resukisu.ui.theme.ThemeConfig
+import com.resukisu.resukisu.ui.theme.haze
+import com.resukisu.resukisu.ui.theme.hazeSource
 import com.resukisu.resukisu.ui.util.LocalSnackbarHost
 import com.resukisu.resukisu.ui.util.execKsud
 import com.resukisu.resukisu.ui.util.getBugreportFile
 import com.resukisu.resukisu.ui.util.getFeatureStatus
-import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.HazeTint
-import dev.chrisbanes.haze.hazeEffect
-import dev.chrisbanes.haze.hazeSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -125,7 +130,7 @@ private val SPACING_LARGE = 16.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsPage(bottomPadding: Dp, hazeState: HazeState?) {
+fun SettingsPage(bottomPadding: Dp) {
     val navigator = LocalNavigator.current
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
     val snackBarHost = LocalSnackbarHost.current
@@ -135,7 +140,7 @@ fun SettingsPage(bottomPadding: Dp, hazeState: HazeState?) {
 
     Scaffold(
         topBar = {
-            TopBar(scrollBehavior = scrollBehavior, hazeState = hazeState)
+            TopBar(scrollBehavior = scrollBehavior)
         },
         snackbarHost = {
             SnackbarHost(
@@ -176,10 +181,9 @@ fun SettingsPage(bottomPadding: Dp, hazeState: HazeState?) {
 
         LazyColumn(
             modifier =
-                (if (hazeState != null)
-                    Modifier.hazeSource(state = hazeState)
-                else Modifier)
-                    .nestedScroll(scrollBehavior.nestedScrollConnection),
+                Modifier
+                    .nestedScroll(scrollBehavior.nestedScrollConnection)
+                    .hazeSource(),
             contentPadding = PaddingValues(
                 top = innerPadding.calculateTopPadding() + 5.dp,
                 start = 0.dp,
@@ -297,6 +301,45 @@ fun SettingsPage(bottomPadding: Dp, hazeState: HazeState?) {
                                             execKsud("feature save", true)
                                             isKernelUmountEnabled = checked
                                         }
+                                    }
+                                )
+                            }
+
+                            item(
+                                visible = Natives.isLateLoadMode
+                            ) {
+                                var savedAutoJailbreakStatus by rememberSaveable {
+                                    mutableStateOf(
+                                        prefs.getBoolean("auto_jailbreak", false)
+                                    )
+                                }
+
+                                SettingsSwitchWidget(
+                                    icon = Icons.Rounded.ElectricalServices,
+                                    title = stringResource(id = R.string.settings_auto_jailbreak),
+                                    description = stringResource(id = R.string.settings_auto_jailbreak_summary),
+                                    checked = savedAutoJailbreakStatus,
+                                    onCheckedChange = { value ->
+                                        runCatching {
+                                            ksuApp.packageManager.setComponentEnabledSetting(
+                                                ComponentName(
+                                                    ksuApp,
+                                                    BootCompletedReceiver::class.java
+                                                ),
+                                                if (value) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                                                PackageManager.DONT_KILL_APP
+                                            )
+                                        }.onFailure {
+                                            Log.e(
+                                                "Settings",
+                                                "failed to change boot receiver state to $value",
+                                                it
+                                            )
+                                        }
+                                        prefs.edit {
+                                            putBoolean("auto_jailbreak", value)
+                                        }
+                                        savedAutoJailbreakStatus = value
                                     }
                                 )
                             }
@@ -804,28 +847,18 @@ fun rememberUninstallDialog(onSelected: (UninstallType) -> Unit): DialogHandle {
 @Composable
 private fun TopBar(
     scrollBehavior: TopAppBarScrollBehavior? = null,
-    hazeState: HazeState? = null
 ) {
-    val hazeStyle = if (ThemeConfig.backgroundImageLoaded) HazeStyle(
+    if (ThemeConfig.backgroundImageLoaded) HazeStyle(
         backgroundColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(
             alpha = 0.8f
         ),
         tint = HazeTint(Color.Transparent)
     ) else null
 
-    val collapsedFraction = scrollBehavior?.state?.collapsedFraction ?: 0f
-    val modifier = if (ThemeConfig.backgroundImageLoaded && hazeStyle != null && hazeState != null) {
-        Modifier.hazeEffect(hazeState) {
-            style = hazeStyle
-            noiseFactor = 0f
-            blurRadius = 30.dp
-            alpha = collapsedFraction
-        }
-    }
-    else Modifier
-
     LargeFlexibleTopAppBar(
-        modifier = modifier,
+        modifier = Modifier.haze(
+            scrollBehavior?.state?.collapsedFraction ?: 1f
+        ),
         title = {
             Text(text = stringResource(R.string.settings))
         },

@@ -76,7 +76,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
-import com.resukisu.resukisu.Natives
 import com.resukisu.resukisu.R
 import com.resukisu.resukisu.ui.MainActivity
 import com.resukisu.resukisu.ui.component.ConfirmResult
@@ -93,11 +92,8 @@ import com.resukisu.resukisu.ui.navigation.LocalNavigator
 import com.resukisu.resukisu.ui.theme.CardConfig
 import com.resukisu.resukisu.ui.theme.ThemeColors
 import com.resukisu.resukisu.ui.theme.ThemeConfig
-import dev.chrisbanes.haze.HazeStyle
-import dev.chrisbanes.haze.HazeTint
-import dev.chrisbanes.haze.hazeEffect
-import dev.chrisbanes.haze.hazeSource
-import dev.chrisbanes.haze.rememberHazeState
+import com.resukisu.resukisu.ui.theme.haze
+import com.resukisu.resukisu.ui.theme.hazeSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -109,6 +105,7 @@ import zako.zako.zako.zakoui.screen.moreSettings.util.LocaleHelper
 import java.io.File
 import kotlin.math.roundToInt
 
+// TODO Rename this screen to ThemeSettingsScreen, and drop SELinux config, rewrite dynamic manager
 @SuppressLint("LocalContextConfigurationRead", "LocalContextResourcesRead", "ObsoleteSdkInt")
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -126,6 +123,7 @@ fun MoreSettingsScreen() {
     val activity = LocalActivity.current as MainActivity
     val settingsHandlers = remember { MoreSettingsHandlers(activity, prefs, settingsState) }
 
+    // TODO Add In app crop as fallback
     // 图片选择器
     val cropImageLauncher = rememberLauncherForActivityResult(
         object : ActivityResultContract<Uri, Uri?>() {
@@ -202,26 +200,6 @@ fun MoreSettingsScreen() {
         handlers = settingsHandlers
     )
 
-    val hazeState = if (ThemeConfig.backgroundImageLoaded) rememberHazeState() else null
-
-    val hazeStyle = if (ThemeConfig.backgroundImageLoaded) HazeStyle(
-        backgroundColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(
-            alpha = 0.8f
-        ),
-        tint = HazeTint(Color.Transparent)
-    ) else null
-
-    val collapsedFraction = scrollBehavior.state.collapsedFraction
-    val modifier = if (ThemeConfig.backgroundImageLoaded && hazeStyle != null && hazeState != null) {
-        Modifier.hazeEffect(hazeState) {
-            style = hazeStyle
-            noiseFactor = 0f
-            blurRadius = 30.dp
-            alpha = collapsedFraction
-        }
-    }
-    else Modifier
-
     val navigator = LocalNavigator.current
 
     LaunchedEffect(Unit) {
@@ -232,7 +210,10 @@ fun MoreSettingsScreen() {
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             LargeFlexibleTopAppBar(
-                modifier = modifier,
+                modifier = Modifier
+                    .haze(
+                        alpha = scrollBehavior.state.collapsedFraction
+                    ),
                 title = {
                     Text(
                         text = stringResource(R.string.more_settings)
@@ -261,9 +242,10 @@ fun MoreSettingsScreen() {
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) { paddingValues ->
         LazyColumn(
-            modifier = if (hazeState != null) Modifier.hazeSource(hazeState) else Modifier
+            modifier = Modifier
                 .fillMaxSize()
                 .nestedScroll(scrollBehavior.nestedScrollConnection)
+                .hazeSource()
         ) {
             item {
                 Spacer(modifier = Modifier.height(paddingValues.calculateTopPadding()))
@@ -331,6 +313,7 @@ private fun AppearanceSettings(
             )
         }
 
+        // TODO MonetCompat with Android S-, Choose System Seed Color or Custom background color
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             item {
                 // 动态颜色开关
@@ -347,6 +330,7 @@ private fun AppearanceSettings(
         item(
             visible = !state.useDynamicColor || Build.VERSION.SDK_INT < Build.VERSION_CODES.S
         ) {
+            // TODO ColorPicker seedColor
             // 主题色选择
             ThemeColorSelection(state = state)
         }
@@ -365,6 +349,8 @@ private fun AppearanceSettings(
                 coroutineScope = coroutineScope
             )
         }
+
+        // TODO Add HazeConfig and unify hazeState management
     }
 }
 
@@ -481,16 +467,14 @@ private fun SplicedGroupScope.hideOptionsSettings(
     }
 
     // KPM 状态信息隐藏
-    if (Natives.version >= Natives.MINIMAL_SUPPORTED_KPM) {
-        item {
-            SettingsSwitchWidget(
-                icon = Icons.Filled.VisibilityOff,
-                title = stringResource(R.string.show_kpm_info),
-                description = stringResource(R.string.show_kpm_info_summary),
-                checked = state.isShowKpmInfo,
-                onCheckedChange = handlers::handleShowKpmInfoChange
-            )
-        }
+    item {
+        SettingsSwitchWidget(
+            icon = Icons.Filled.VisibilityOff,
+            title = stringResource(R.string.show_kpm_info),
+            description = stringResource(R.string.show_kpm_info_summary),
+            checked = state.isShowKpmInfo,
+            onCheckedChange = handlers::handleShowKpmInfoChange
+        )
     }
 
     item {
@@ -538,21 +522,19 @@ private fun AdvancedSettings(
 
         item {
             // 动态管理器设置
-            if (Natives.version >= Natives.MINIMAL_SUPPORTED_DYNAMIC_MANAGER && Natives.version >= Natives.MINIMAL_NEW_IOCTL_KERNEL) {
-                SettingsJumpPageWidget(
-                    icon = Icons.Filled.Security,
-                    title = stringResource(R.string.dynamic_manager_title),
-                    description = if (state.isDynamicSignEnabled) {
-                        stringResource(
-                            R.string.dynamic_manager_enabled_summary,
-                            state.dynamicSignSize
-                        )
-                    } else {
-                        stringResource(R.string.dynamic_manager_disabled)
-                    },
-                    onClick = { state.showDynamicSignDialog = true }
-                )
-            }
+            SettingsJumpPageWidget(
+                icon = Icons.Filled.Security,
+                title = stringResource(R.string.dynamic_manager_title),
+                description = if (state.isDynamicSignEnabled) {
+                    stringResource(
+                        R.string.dynamic_manager_enabled_summary,
+                        state.dynamicSignSize
+                    )
+                } else {
+                    stringResource(R.string.dynamic_manager_disabled)
+                },
+                onClick = { state.showDynamicSignDialog = true }
+            )
         }
     }
 }
@@ -743,6 +725,7 @@ private fun CustomBackgroundSettings(
     pickImageLauncher: ManagedActivityResultLauncher<String, Uri?>,
     coroutineScope: CoroutineScope
 ) {
+    // TODO Portrait/Landscape wallpaper split
     // 自定义背景开关
     SettingsSwitchWidget(
         icon = Icons.Filled.Wallpaper,
@@ -782,6 +765,7 @@ private fun BackgroundAdjustmentControls(
         // 透明度滑动条
         AlphaSlider(state = state, handlers = handlers, coroutineScope = coroutineScope)
 
+        // TODO Set an default Dim for background
         // 亮度调节滑动条
         DimSlider(state = state, handlers = handlers, coroutineScope = coroutineScope)
     }

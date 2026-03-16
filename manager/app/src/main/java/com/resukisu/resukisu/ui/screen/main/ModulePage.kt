@@ -149,6 +149,7 @@ import com.resukisu.resukisu.ui.screen.FlashIt
 import com.resukisu.resukisu.ui.screen.LabelText
 import com.resukisu.resukisu.ui.theme.getCardColors
 import com.resukisu.resukisu.ui.theme.getCardElevation
+import com.resukisu.resukisu.ui.theme.hazeSource
 import com.resukisu.resukisu.ui.util.DownloadListener
 import com.resukisu.resukisu.ui.util.LocalSnackbarHost
 import com.resukisu.resukisu.ui.util.download
@@ -162,8 +163,6 @@ import com.resukisu.resukisu.ui.util.uninstallModule
 import com.resukisu.resukisu.ui.viewmodel.ModuleViewModel
 import com.resukisu.resukisu.ui.webui.WebUIActivity
 import com.topjohnwu.superuser.io.SuFile
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -180,7 +179,7 @@ private enum class ShortcutType {
 @SuppressLint("ResourceType", "AutoboxingStateCreation")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ModulePage(bottomPadding: Dp, hazeState: HazeState?) {
+fun ModulePage(bottomPadding: Dp) {
     val navigator = LocalNavigator.current
     val context = LocalContext.current
     val viewModel = viewModel<ModuleViewModel>(
@@ -330,7 +329,6 @@ fun ModulePage(bottomPadding: Dp, hazeState: HazeState?) {
                 },
                 scrollBehavior = scrollBehavior,
                 searchBarPlaceHolderText = stringResource(R.string.search_modules),
-                hazeState = hazeState
             )
         },
         floatingActionButton = {
@@ -460,7 +458,6 @@ fun ModulePage(bottomPadding: Dp, hazeState: HazeState?) {
                     snackBarHost = snackBarHost,
                     bottomPadding = bottomPadding + innerPadding.calculateBottomPadding(),
                     topPadding = innerPadding.calculateTopPadding(),
-                    hazeState = hazeState
                 )
             }
         }
@@ -615,12 +612,7 @@ private fun getMetaModuleWarningText(
     context: Context
 ) : String? {
     if (!showMetamoduleWarning) return null
-
-    val hasSystemModule = viewModel.moduleList.any { module ->
-        SuFile.open("/data/adb/modules/${module.id}/system").exists()
-    }
-
-    if (!hasSystemModule) return null
+    if (!viewModel.hasModuleRequireMount) return null
 
     val metaProp = SuFile.open("/data/adb/metamodule/module.prop").exists()
     val metaRemoved = SuFile.open("/data/adb/metamodule/remove").exists()
@@ -675,7 +667,6 @@ private fun ModuleList(
     snackBarHost: SnackbarHostState,
     bottomPadding : Dp,
     topPadding : Dp,
-    hazeState : HazeState?
 ) {
     val pullRefreshState = rememberPullToRefreshState()
     val failedEnable = stringResource(R.string.module_failed_to_enable)
@@ -941,16 +932,14 @@ private fun ModuleList(
         }
     }
 
-    var pullToRefreshBoxModifier = boxModifier
-
-    pullToRefreshBoxModifier = if (hazeState != null) pullToRefreshBoxModifier.hazeSource(state = hazeState) else pullToRefreshBoxModifier
-
     PullToRefreshBox(
         state = pullRefreshState,
         onRefresh = {
             viewModel.fetchModuleList(true)
         },
-        modifier = pullToRefreshBoxModifier.fillMaxSize(),
+        modifier = boxModifier
+            .fillMaxSize()
+            .hazeSource(),
         indicator = {
             PullToRefreshDefaults.LoadingIndicator(
                 modifier = Modifier
@@ -962,7 +951,11 @@ private fun ModuleList(
         },
         isRefreshing = viewModel.isRefreshing
     ) {
-        val metaModuleWarningText by produceState<String?>(initialValue = null, viewModel.moduleList) {
+        val metaModuleWarningText by produceState<String?>(
+            initialValue = null,
+            viewModel.hasModuleRequireMount,
+            showMetamoduleWarning
+        ) {
             value = withContext(Dispatchers.IO) {
                 getMetaModuleWarningText(viewModel, context)
             }
@@ -981,7 +974,7 @@ private fun ModuleList(
             },
         ) {
             item {
-                Spacer(modifier = Modifier.height(topPadding))
+                Spacer(modifier = Modifier.height(topPadding + 1.dp))
             }
 
             if (metaModuleWarningText != null) {
