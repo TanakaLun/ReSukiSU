@@ -541,7 +541,7 @@ pub fn run() -> Result<()> {
 
     if arg0.ends_with("resetprop") {
         let all_args: Vec<String> = std::env::args().collect();
-        return crate::android::resetprop::run_from_args(&all_args);
+        crate::android::resetprop::resetprop_main(&all_args);
     }
 
     let cli = Args::parse();
@@ -790,7 +790,7 @@ pub fn run() -> Result<()> {
         Commands::Resetprop { args } => {
             let mut full_args = vec!["resetprop".to_string()];
             full_args.extend(args);
-            crate::android::resetprop::run_from_args(&full_args)
+            crate::android::resetprop::resetprop_main(&full_args)
         }
 
         Commands::Kernel { command } => match command {
