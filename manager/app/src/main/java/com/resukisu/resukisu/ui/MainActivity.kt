@@ -28,7 +28,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -726,56 +725,40 @@ fun MainScreen() {
             modifier = Modifier.fillMaxSize()
         ) {
             val isPortrait = maxWidth < maxHeight || (maxHeight / maxWidth > 1.4f)
-            MainScreenContent(
-                isPortrait = isPortrait,
-                pages = pages,
-                userScrollEnabled = userScrollEnabled,
-                pagerState = pagerState,
-            )
-        }
-    }
-}
+            val content = @Composable { paddingBottom: Dp ->
+                HorizontalPager(
+                    modifier = Modifier.fillMaxSize(),
+                    state = pagerState,
+                    userScrollEnabled = userScrollEnabled,
+                ) { pageIndex ->
+                    if (pages.isEmpty()) return@HorizontalPager
+                    val destination = pages[pageIndex]
+                    destination.direction(paddingBottom)
+                }
+            }
 
-@Composable
-private fun MainScreenContent(
-    isPortrait: Boolean,
-    pages: List<BottomBarDestination>,
-    userScrollEnabled: Boolean,
-    pagerState: PagerState
-) {
-    val content = @Composable { paddingBottom: Dp ->
-        HorizontalPager(
-            modifier = Modifier.fillMaxSize(),
-            state = pagerState,
-            beyondViewportPageCount = 2,
-            userScrollEnabled = userScrollEnabled,
-        ) { pageIndex ->
-            if (pages.isEmpty()) return@HorizontalPager
-            val destination = pages[pageIndex]
-            destination.direction(paddingBottom)
-        }
-    }
-
-    if (isPortrait) {
-        Scaffold(
-            modifier = Modifier.fillMaxSize(),
-            bottomBar = {
-                NavigationBar(
-                    destinations = pages,
-                    isBottomBar = true,
-                )
-            },
-            containerColor = Color.Transparent,
-        ) { innerPadding ->
-            content(innerPadding.calculateBottomPadding())
-        }
-    } else {
-        Row(modifier = Modifier.fillMaxSize()) {
-            NavigationBar(
-                destinations = pages,
-                isBottomBar = false,
-            )
-            content(0.dp)
+            if (isPortrait) {
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    bottomBar = {
+                        NavigationBar(
+                            destinations = pages,
+                            isBottomBar = true,
+                        )
+                    },
+                    containerColor = Color.Transparent,
+                ) { innerPadding ->
+                    content(innerPadding.calculateBottomPadding())
+                }
+            } else {
+                Row(modifier = Modifier.fillMaxSize()) {
+                    NavigationBar(
+                        destinations = pages,
+                        isBottomBar = false,
+                    )
+                    content(0.dp)
+                }
+            }
         }
     }
 }

@@ -136,7 +136,8 @@ class ModuleViewModel : ViewModel() {
     }
 
     fun fetchModuleList(
-        manualRefresh: Boolean = false
+        manualRefresh: Boolean = false,
+        callBack: () -> Unit = {},
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             isRefreshing = true
@@ -227,6 +228,7 @@ class ModuleViewModel : ViewModel() {
             }
 
             Log.i(TAG, "load cost: ${SystemClock.elapsedRealtime() - start}, modules: $modules")
+            callBack()
         }
     }
 
