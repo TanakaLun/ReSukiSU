@@ -13,6 +13,9 @@
 #else
 #include <crypto/sha.h>
 #endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 4, 0)
+#include <linux/hex.h>
+#endif
 
 #include "manager/apk_sign.h"
 #include "manager/manager_identity.h"
@@ -37,6 +40,9 @@ static apk_sign_key_t apk_sign_keys[] = {
     { EXPECTED_SIZE_KOWX712, EXPECTED_HASH_KOWX712 }, // KOWX712/KernelSU
 #ifdef EXPECTED_SIZE
     { EXPECTED_SIZE, EXPECTED_HASH }, // Custom
+#endif
+#ifdef EXPECTED_PR_BUILD_SIZE
+    { EXPECTED_PR_BUILD_SIZE, EXPECTED_PR_BUILD_HASH }, // Custom 2 (For PR build)
 #endif
 #endif
 };
@@ -217,7 +223,7 @@ static __always_inline bool check_v2_signature(char *path, u8 *signature_index)
     bool v3_1_signing_exist = false;
     u8 matched_index = -1;
     int i;
-    struct file *fp = ksu_filp_open_compat(path, O_RDONLY, 0);
+    struct file *fp = filp_open(path, O_RDONLY, 0);
     if (IS_ERR(fp)) {
         pr_err("open %s error.\n", path);
         return false;

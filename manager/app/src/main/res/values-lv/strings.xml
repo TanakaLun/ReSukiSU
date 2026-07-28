@@ -4,7 +4,6 @@
     <string name="home_not_installed">Nav ieinstalēts</string>
     <string name="home_click_to_install">Noklikšķiniet, lai instalētu</string>
     <string name="home_working">Darbojas</string>
-    <string name="home_working_version">Versija: %s</string>
     <string name="home_unsupported">Neatbalstīts</string>
     <string name="home_unsupported_reason">KernelSU atbalsta tikai GKI kodolus</string>
     <string name="home_kernel">Kodols</string>
@@ -20,7 +19,6 @@
     <string name="module_empty">Nav instalētu moduļu</string>
     <string name="module">Moduļi</string>
     <string name="uninstall">Atinstalēt</string>
-    <string name="module_install">Instalēt</string>
     <string name="install">Instalēt</string>
     <string name="reboot">Restartēt</string>
     <string name="settings">Iestatījumi</string>
@@ -49,7 +47,6 @@
     <string name="profile_default">Noklusējums</string>
     <string name="profile_template">Veidne</string>
     <string name="profile_custom">Pielāgots</string>
-    <string name="profile_name">Profila vārds</string>
     <string name="profile_groups">Grupas</string>
     <string name="profile_capabilities">Iespējas</string>
     <string name="profile_selinux_context">SELinux konteksts</string>
@@ -94,8 +91,6 @@
     <string name="settings_check_update">Atjaunināšanas paziņojumi</string>
     <string name="settings_check_update_summary">Automātiski pārbaudīt moduļa un pārvaldnieka atjauninājumus</string>
     <string name="grant_root_failed">Neizdevās piešķirt sakni!</string>
-    <string name="enable_web_debugging">Iespējot WebView atkļūdošanu</string>
-    <string name="enable_web_debugging_summary">Var izmantot WebUI atkļūdošanai, lūdzu, izmantot tikai tad, kad tas ir nepieciešams.</string>
     <string name="direct_install">Tiešā instalēšana (Ieteicams)</string>
     <string name="select_file">Izvēlieties failu</string>
     <string name="install_inactive_slot">Instalēt neaktīvajā slotā (pēc OTA)</string>

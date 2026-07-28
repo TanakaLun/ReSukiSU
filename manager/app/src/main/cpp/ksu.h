@@ -14,6 +14,10 @@
 
 #include "uapi/ksu.h"
 
+uint32_t get_kernel_uapi_version();
+
+uint32_t get_manager_uapi_version();
+
 uint32_t get_version();
 
 bool uid_should_umount(int uid);
@@ -24,6 +28,7 @@ bool is_lkm_mode();
 
 bool is_manager();
 bool is_late_load_mode();
+bool is_pr_build();
 
 void get_full_version(char* buff);
 
@@ -31,9 +36,9 @@ bool set_app_profile(const struct app_profile *profile);
 
 int get_app_profile(struct app_profile* profile);
 
-bool is_KPM_enable();
+void get_hook_type(char *buff);
 
-void get_hook_type(char* hook_type);
+int get_kernel_patch_implement();
 
 bool set_dynamic_manager(unsigned int size, const char* hash);
 
@@ -54,6 +59,11 @@ bool set_sulog_enabled(bool enabled);
 bool set_kernel_umount_enabled(bool enabled);
 bool is_kernel_umount_enabled();
 
+// SELinux hide
+int set_selinux_hide_enabled(bool enabled);
+
+bool is_selinux_hide_enabled();
+
 bool get_managers_list(struct ksu_get_managers_cmd **out_cmd);
 bool get_allow_list(struct ksu_new_get_allow_list_cmd *);
 
@@ -72,7 +82,6 @@ bool legacy_set_app_profile(const struct app_profile* profile);
 bool legacy_get_app_profile(char* key, struct app_profile* profile);
 bool legacy_set_su_enabled(bool enabled);
 bool legacy_is_su_enabled();
-bool legacy_is_KPM_enable();
 bool legacy_get_hook_type(char* hook_type, size_t size);
 void legacy_get_full_version(char* buff);
 

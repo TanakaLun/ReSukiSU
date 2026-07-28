@@ -9,6 +9,7 @@
 #include <linux/susfs_def.h>
 #endif
 
+#include <linux/thread_info.h>
 #include "uapi/supercall.h"
 #include "supercall/internal.h"
 #include "arch.h"
@@ -21,18 +22,19 @@
 #include "manager/manager_identity.h"
 #include "selinux/selinux.h"
 #include "infra/file_wrapper.h"
-#ifdef KSU_TP_HOOK
+#ifdef CONFIG_KSU_TRACEPOINT_HOOK
 #include "hook/tp_marker.h"
 #endif
 #include "feature/dynamic_manager.h"
 #include "policy/app_profile.h"
-#ifdef CONFIG_KPM
-#include "kpm/kpm.h"
-#endif
 
 #ifdef CONFIG_KSU_TOOLKIT_SUPPORT
 #include <linux/utsname.h> // utsname() and uts_sem
 #include "manager/manager_identity.h" // for change_manager_appid
+#endif
+
+#ifdef CONFIG_ARM64
+#include "compat/apatch_conflict.h"
 #endif
 
 #include "sulog/event.h"
@@ -65,12 +67,51 @@ static int do_get_info(void __user *arg)
 #ifdef MODULE
     cmd.flags |= KSU_GET_INFO_FLAG_LKM;
 #endif
+#ifdef EXPECTED_PR_BUILD_SIZE
+    cmd.flags |= KSU_GET_INFO_FLAG_PR_BUILD;
+#endif
     if (is_manager()) {
         cmd.flags |= KSU_GET_INFO_FLAG_MANAGER;
     }
     if (ksu_late_loaded) {
         cmd.flags |= KSU_GET_INFO_FLAG_LATE_LOAD;
     }
+    cmd.features = KSU_FEATURE_MAX;
+    cmd.uapi_version = KERNEL_SU_UAPI_VERSION;
+
+#ifdef CONFIG_KSU_TOOLKIT_SUPPORT
+    if (ksuver_override)
+        cmd.version = ksuver_override;
+
+    if (ksuflags_override)
+        cmd.flags = ksuflags_override;
+#endif
+
+    if (copy_to_user(arg, &cmd, sizeof(cmd))) {
+        pr_err("get_version: copy_to_user failed\n");
+        return -EFAULT;
+    }
+
+    return 0;
+}
+
+static int do_get_info_legacy(void __user *arg)
+{
+    struct ksu_get_info_legacy_cmd cmd = { .version = KERNEL_SU_VERSION, .flags = 0 };
+
+#ifdef MODULE
+    cmd.flags |= KSU_GET_INFO_FLAG_LKM;
+#endif
+
+    if (is_manager()) {
+        cmd.flags |= KSU_GET_INFO_FLAG_MANAGER;
+    }
+    if (ksu_late_loaded) {
+        cmd.flags |= KSU_GET_INFO_FLAG_LATE_LOAD;
+    }
+#ifdef EXPECTED_PR_BUILD_SIZE
+    cmd.flags |= KSU_GET_INFO_FLAG_PR_BUILD;
+#endif
     cmd.features = KSU_FEATURE_MAX;
 
 #ifdef CONFIG_KSU_TOOLKIT_SUPPORT
@@ -333,24 +374,30 @@ static int do_get_app_profile(void __user *arg)
 #ifdef CONFIG_KSU_DISABLE_POLICY
     return -EOPNOTSUPP;
 #endif
+    uid_t uid;
+    struct app_profile *profile;
+    int ret = 0;
 
-    struct ksu_get_app_profile_cmd cmd;
-
-    if (copy_from_user(&cmd, arg, sizeof(cmd))) {
+    if (copy_from_user(&uid, (char __user *)arg + offsetof(struct ksu_get_app_profile_cmd, profile.curr_uid),
+                       sizeof(uid_t))) {
         pr_err("get_app_profile: copy_from_user failed\n");
         return -EFAULT;
     }
 
-    if (!ksu_get_app_profile(&cmd.profile)) {
-        return -ENOENT;
+    rcu_read_lock();
+    profile = ksu_get_app_profile(uid);
+    rcu_read_unlock();
+    if (!profile) {
+        ret = -ENOENT;
+    } else {
+        if (copy_to_user((char __user *)arg + offsetof(struct ksu_get_app_profile_cmd, profile), profile,
+                         sizeof(struct app_profile))) {
+            pr_err("get_app_profile: copy_to_user failed\n");
+            ret = -EFAULT;
+        }
+        ksu_put_app_profile(profile);
     }
-
-    if (copy_to_user(arg, &cmd, sizeof(cmd))) {
-        pr_err("get_app_profile: copy_to_user failed\n");
-        return -EFAULT;
-    }
-
-    return 0;
+    return ret;
 }
 
 static int do_set_app_profile(void __user *arg)
@@ -370,7 +417,7 @@ static int do_set_app_profile(void __user *arg)
     ret = ksu_set_app_profile(&cmd.profile);
     if (!ret) {
         ksu_persistent_allow_list();
-#ifdef KSU_TP_HOOK
+#ifdef CONFIG_KSU_TRACEPOINT_HOOK
         ksu_mark_running_process();
 #endif
     }
@@ -425,9 +472,11 @@ static int do_set_feature(void __user *arg)
 }
 
 // kcompat for older kernel
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
+// https://github.com/torvalds/linux/commit/4f0b9194bc119a9850a99e5e824808e2f468c348
+// 6.8
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 8, 0) || defined(KSU_HAS_ANON_INODE_CREATE_FD)
 #define getfd_secure anon_inode_create_getfd
-#elif defined(KSU_HAS_GETFD_SECURE)
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0) || defined(KSU_HAS_GETFD_SECURE)
 #define getfd_secure anon_inode_getfd_secure
 #else
 // technically not a secure inode, but, this is the only way so.
@@ -461,7 +510,7 @@ static int do_manage_mark(void __user *arg)
 
     switch (cmd.operation) {
     case KSU_MARK_GET: {
-#if defined(KSU_TP_HOOK)
+#if defined(CONFIG_KSU_TRACEPOINT_HOOK)
         // Get task mark status
         ret = ksu_get_task_mark(cmd.pid);
         if (ret < 0) {
@@ -483,7 +532,7 @@ static int do_manage_mark(void __user *arg)
         break;
     }
     case KSU_MARK_MARK: {
-#ifdef KSU_TP_HOOK
+#ifdef CONFIG_KSU_TRACEPOINT_HOOK
         if (cmd.pid == 0) {
             ksu_mark_all_process();
         } else {
@@ -501,7 +550,7 @@ static int do_manage_mark(void __user *arg)
         break;
     }
     case KSU_MARK_UNMARK: {
-#ifdef KSU_TP_HOOK
+#ifdef CONFIG_KSU_TRACEPOINT_HOOK
         if (cmd.pid == 0) {
             ksu_unmark_all_process();
         } else {
@@ -519,7 +568,7 @@ static int do_manage_mark(void __user *arg)
         break;
     }
     case KSU_MARK_REFRESH: {
-#ifdef KSU_TP_HOOK
+#ifdef CONFIG_KSU_TRACEPOINT_HOOK
         ksu_mark_running_process();
         pr_info("manage_mark: refreshed running processes\n");
 #else
@@ -811,6 +860,12 @@ static int do_get_sulog_fd(void __user *arg)
     return ksu_install_sulog_fd();
 }
 
+static int do_disable_escape_to_root(void __user *arg)
+{
+    set_thread_flag(TIF_KSU_DISABLE_ESCAPE_WITH_ROOT);
+    return 0;
+}
+
 // 100. GET_FULL_VERSION - Get full version string
 static int do_get_full_version(void __user *arg)
 {
@@ -834,7 +889,7 @@ static int do_get_full_version(void __user *arg)
 static int do_get_hook_type(void __user *arg)
 {
     struct ksu_hook_type_cmd cmd = { 0 };
-#if defined(KSU_TP_HOOK)
+#if defined(CONFIG_KSU_TRACEPOINT_HOOK)
     const char *type = "Tracepoint Syscall Redirect";
 #elif defined(CONFIG_KSU_MANUAL_HOOK)
     const char *type = "Manual";
@@ -852,21 +907,6 @@ static int do_get_hook_type(void __user *arg)
 
     if (copy_to_user(arg, &cmd, sizeof(cmd))) {
         pr_err("get_hook_type: copy_to_user failed\n");
-        return -EFAULT;
-    }
-
-    return 0;
-}
-
-// 102. ENABLE_KPM - Check if KPM is enabled
-static int do_enable_kpm(void __user *arg)
-{
-    struct ksu_enable_kpm_cmd cmd;
-
-    cmd.enabled = IS_ENABLED(CONFIG_KPM);
-
-    if (copy_to_user(arg, &cmd, sizeof(cmd))) {
-        pr_err("enable_kpm: copy_to_user failed\n");
         return -EFAULT;
     }
 
@@ -927,6 +967,109 @@ static int do_get_managers(void __user *arg)
     return 0;
 }
 
+static int do_get_kernel_patch_implement(void __user *arg)
+{
+    struct ksu_get_kernel_patch_implement cmd = { 0 };
+#ifdef CONFIG_ARM64
+    cmd.type = kernel_patch_type;
+#else
+    // Kernel Patch are only support aarch64 ABI
+    cmd.type = KERNEL_PATCH_NOT_FOUND;
+#endif
+
+    if (copy_to_user(arg, &cmd, sizeof(cmd))) {
+        pr_err("get_kernel_patch_implement: copy_to_user failed\n");
+        return -EFAULT;
+    }
+
+    return 0;
+}
+
+#ifdef CONFIG_KSU_SUSFS
+int ksu_handle_susfs_cmd(unsigned int cmd, void __user **arg)
+{
+    switch (cmd) {
+#ifdef CONFIG_KSU_SUSFS_SUS_PATH
+    case CMD_SUSFS_ADD_SUS_PATH: {
+        susfs_add_sus_path(arg);
+        return 0;
+    }
+    case CMD_SUSFS_ADD_SUS_PATH_LOOP: {
+        susfs_add_sus_path_loop(arg);
+        return 0;
+    }
+#endif //#ifdef CONFIG_KSU_SUSFS_SUS_PATH
+#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+    case CMD_SUSFS_HIDE_SUS_MNTS_FOR_NON_SU_PROCS: {
+        susfs_set_hide_sus_mnts_for_non_su_procs(arg);
+        return 0;
+    }
+#endif //#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
+    case CMD_SUSFS_ADD_SUS_KSTAT: {
+        susfs_add_sus_kstat(arg);
+        return 0;
+    }
+    case CMD_SUSFS_UPDATE_SUS_KSTAT: {
+        susfs_update_sus_kstat(arg);
+        return 0;
+    }
+    case CMD_SUSFS_ADD_SUS_KSTAT_STATICALLY: {
+        susfs_add_sus_kstat(arg);
+        return 0;
+    }
+#endif //#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
+#ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME
+    case CMD_SUSFS_SET_UNAME: {
+        susfs_set_uname(arg);
+        return 0;
+    }
+#endif //#ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME
+#ifdef CONFIG_KSU_SUSFS_ENABLE_LOG
+    case CMD_SUSFS_ENABLE_LOG: {
+        susfs_enable_log(arg);
+        return 0;
+    }
+#endif //#ifdef CONFIG_KSU_SUSFS_ENABLE_LOG
+#ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
+    case CMD_SUSFS_SET_CMDLINE_OR_BOOTCONFIG: {
+        susfs_set_cmdline_or_bootconfig(arg);
+        return 0;
+    }
+#endif //#ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
+#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
+    case CMD_SUSFS_ADD_OPEN_REDIRECT: {
+        susfs_add_open_redirect(arg);
+        return 0;
+    }
+#endif //#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
+#ifdef CONFIG_KSU_SUSFS_SUS_MAP
+    case CMD_SUSFS_ADD_SUS_MAP: {
+        susfs_add_sus_map(arg);
+        return 0;
+    }
+#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
+    case CMD_SUSFS_ENABLE_AVC_LOG_SPOOFING: {
+        susfs_set_avc_log_spoofing(arg);
+        return 0;
+    }
+    case CMD_SUSFS_SHOW_ENABLED_FEATURES: {
+        susfs_get_enabled_features(arg);
+        return 0;
+    }
+    case CMD_SUSFS_SHOW_VARIANT: {
+        susfs_show_variant(arg);
+        return 0;
+    }
+    case CMD_SUSFS_SHOW_VERSION: {
+        susfs_show_version(arg);
+        return 0;
+    }
+    }
+    return 0;
+}
+#endif
+
 #ifdef CONFIG_KSU_TOOLKIT_SUPPORT
 int ksu_try_handle_toolkit_cmd(int magic2, unsigned int cmd, void __user **arg)
 {
@@ -986,8 +1129,6 @@ int ksu_try_handle_toolkit_cmd(int magic2, unsigned int cmd, void __user **arg)
             pr_err("handle_toolkit_cmd: copy_from_user fail\n");
             return 1;
         }
-
-        pr_info("handle_toolkit_cmd: u_ptr: 0x%lx \n", (uintptr_t)u_ptr);
 
         // for release
         if (strncpy_from_user(release_buf, (char __user *)u_ptr, sizeof(release_buf)) < 0) {
@@ -1062,6 +1203,12 @@ static const struct ksu_ioctl_cmd_map ksu_ioctl_handlers[] = {
         .name = "GET_INFO", 
         .handler = do_get_info, 
         .perm_check = always_allow 
+    },
+    {
+        .cmd = KSU_IOCTL_GET_INFO_LEGACY,
+        .name = "GET_INFO_LEGACY",
+        .handler = do_get_info_legacy,
+        .perm_check = always_allow
     },
     { 
         .cmd = KSU_IOCTL_REPORT_EVENT, 
@@ -1183,6 +1330,12 @@ static const struct ksu_ioctl_cmd_map ksu_ioctl_handlers[] = {
         .handler = do_get_sulog_fd,
         .perm_check = only_root
     },
+    { 
+        .cmd = KSU_IOCTL_DISABLE_ESCAPE_TO_ROOT, 
+        .name = "DISABLE_ESCAPE_TO_ROOT", 
+        .handler = do_disable_escape_to_root, 
+        .perm_check = only_root 
+    },
     // downstream begin
     { 
         .cmd = KSU_IOCTL_GET_FULL_VERSION,
@@ -1197,12 +1350,6 @@ static const struct ksu_ioctl_cmd_map ksu_ioctl_handlers[] = {
         .perm_check = manager_or_root 
     },
     { 
-        .cmd = KSU_IOCTL_ENABLE_KPM, 
-        .name = "GET_ENABLE_KPM", 
-        .handler = do_enable_kpm, 
-        .perm_check = manager_or_root 
-    },
-    { 
         .cmd = KSU_IOCTL_DYNAMIC_MANAGER,
         .name = "SET_DYNAMIC_MANAGER",
         .handler = do_dynamic_manager,
@@ -1214,14 +1361,12 @@ static const struct ksu_ioctl_cmd_map ksu_ioctl_handlers[] = {
         .handler = do_get_managers, 
         .perm_check = manager_or_root 
     },
-#ifdef CONFIG_KPM
     { 
-        .cmd = KSU_IOCTL_KPM, 
-        .name = "KPM_OPERATION", 
-        .handler = do_kpm, 
+        .cmd = KSU_IOCTL_GET_KERNEL_PATCH_IMPLEMENT, 
+        .name = "GET_KERNEL_PATCH_IMPLEMENT", 
+        .handler = do_get_kernel_patch_implement, 
         .perm_check = manager_or_root 
     },
-#endif
     { 
         .cmd = 0, 
         .name = NULL, 

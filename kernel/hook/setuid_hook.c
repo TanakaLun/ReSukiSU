@@ -1,9 +1,6 @@
 #include <linux/compiler.h>
 #include <linux/version.h>
 #include <linux/slab.h>
-#ifdef KSU_TP_HOOK
-#include <linux/task_work.h>
-#endif
 #include <linux/thread_info.h>
 #include <linux/seccomp.h>
 #include <linux/printk.h>
@@ -24,11 +21,12 @@
 #include "manager/manager_identity.h"
 #include "infra/seccomp_cache.h"
 #include "supercall/supercall.h"
-#ifdef KSU_TP_HOOK
+#ifdef CONFIG_KSU_TRACEPOINT_HOOK
 #include "hook/tp_marker.h"
 #endif
 #include "compat/kernel_compat.h"
 #include "feature/kernel_umount.h"
+#include "feature/sucompat.h"
 
 static inline void ksu_set_file_immutable(const char *path_name, bool immutable)
 {
@@ -97,8 +95,10 @@ int ksu_handle_setuid(uid_t new_uid, uid_t old_uid)
         ksu_install_fd();
         spin_lock_irq(&current->sighand->siglock);
         ksu_seccomp_allow_cache(current->seccomp.filter, __NR_reboot);
-#ifdef KSU_TP_HOOK
+#ifdef CONFIG_KSU_TRACEPOINT_HOOK
         ksu_set_task_tracepoint_flag(current);
+#else
+        ksu_clear_current_proc_unprivillege();
 #endif
         spin_unlock_irq(&current->sighand->siglock);
         return 0;
@@ -110,19 +110,25 @@ int ksu_handle_setuid(uid_t new_uid, uid_t old_uid)
             ksu_seccomp_allow_cache(current->seccomp.filter, __NR_reboot);
             spin_unlock_irq(&current->sighand->siglock);
         }
-#ifdef KSU_TP_HOOK
+#ifdef CONFIG_KSU_TRACEPOINT_HOOK
         ksu_set_task_tracepoint_flag(current);
+#else
+        ksu_clear_current_proc_unprivillege();
 #endif
-    }
-#ifdef KSU_TP_HOOK
-    else {
+    } else {
+#ifdef CONFIG_KSU_TRACEPOINT_HOOK
         ksu_clear_task_tracepoint_flag_if_needed(current);
-    }
+#else
+        ksu_set_current_proc_unprivillege();
 #endif
+    }
 
 #else // #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
     if (ksu_is_allow_uid_for_current(new_uid)) {
         disable_seccomp();
+#ifndef CONFIG_KSU_TRACEPOINT_HOOK
+        ksu_clear_current_proc_unprivillege();
+#endif
 
         if (ksu_is_manager_uid(new_uid)) {
             pr_info("install fd for ksu manager(uid=%d)\n", new_uid);
@@ -132,6 +138,8 @@ int ksu_handle_setuid(uid_t new_uid, uid_t old_uid)
         }
 
         return 0;
+    } else {
+        ksu_set_current_proc_unprivillege();
     }
 #endif // #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
 

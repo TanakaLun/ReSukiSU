@@ -4,7 +4,6 @@
     <string name="home_not_installed">Tidak terpasang</string>
     <string name="home_click_to_install">Tekan untuk memasang</string>
     <string name="home_working">Berjalan</string>
-    <string name="home_working_version">Versi: %s</string>
     <string name="home_unsupported">Tidak Disokong</string>
     <string name="home_unsupported_reason">KernelSU ketika ini hanya menyokong kernel GKI</string>
     <string name="home_manager_version">Versi manager</string>
@@ -21,7 +20,6 @@
     <string name="module_sort_action_first">Sort (Action first)</string>
     <string name="module_sort_enabled_first">Sort (Enabled first)</string>
     <string name="uninstall">Padam</string>
-    <string name="module_install">Pasang</string>
     <string name="install">Pasang</string>
     <string name="reboot">Reboot</string>
     <string name="settings">Tetapan</string>

@@ -2,6 +2,7 @@
 
 plugins {
     alias(libs.plugins.agp.app)
+    alias(libs.plugins.androidx.baselineprofile)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.lsplugin.apksign)
@@ -123,6 +124,9 @@ android {
         versionCode = managerVersionCode
         versionName = managerVersionName
 
+        val isPrBuild = project.findProperty("IS_PR_BUILD")?.toString()?.toBoolean() ?: false
+        buildConfigField("boolean", "IS_PR_BUILD", isPrBuild.toString())
+
         externalNativeBuild {
             cmake {
                 arguments += "-DANDROID_STL=none"
@@ -156,6 +160,12 @@ android {
     }
 }
 
+baselineProfile {
+    mergeIntoMain = true
+    saveInSrc = true
+    automaticGenerationDuringBuild = false
+}
+
 base {
     archivesName.set(
         "ReSukiSU_${managerVersionName}_${managerVersionCode}"
@@ -176,8 +186,13 @@ aboutLibraries {
 }
 
 dependencies {
+    lintChecks(project(":lint-rules"))
+    baselineProfile(project(":baselineprofile"))
+
     implementation(libs.gson)
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.core.splashscreen)
+    implementation(libs.androidx.profileinstaller)
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.material.icons.extended)
@@ -186,6 +201,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.foundation)
     implementation(libs.androidx.documentfile)
+    implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.compose.foundation)
 
     implementation(libs.androidx.compose.runtime.tracing)
@@ -198,7 +214,8 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.navigation3)
 
     implementation(libs.androidx.navigation3.runtime)
-    implementation(libs.androidx.navigation3.ui)
+    implementation(libs.miuix.blur)
+    implementation(libs.miuix.navigation)
     implementation(libs.androidx.navigationevent) {
         exclude(group = "androidx.navigation", module = "navigationevent-compose")
     }
@@ -210,22 +227,20 @@ dependencies {
     implementation(libs.com.github.topjohnwu.libsu.service)
     implementation(libs.com.github.topjohnwu.libsu.io)
 
-    implementation(libs.m3color)
-    implementation(libs.haze)
-    implementation(libs.haze.materials)
+    implementation(libs.material.kolor)
+    implementation(libs.monet.compat)
+    implementation(libs.material.components)
+    implementation(libs.androidx.palette.ktx)
     implementation(libs.capsule)
 
     implementation(libs.dev.rikka.rikkax.parcelablelist)
 
     implementation(libs.io.coil.kt.coil.compose)
+    implementation(libs.ucrop)
 
     implementation(libs.kotlinx.coroutines.core)
 
     implementation(libs.me.zhanghai.android.appiconloader.coil)
-
-    implementation(libs.sheet.compose.dialogs.core)
-    implementation(libs.sheet.compose.dialogs.list)
-    implementation(libs.sheet.compose.dialogs.input)
 
     implementation(libs.markdown)
     implementation(libs.androidx.webkit)

@@ -10,6 +10,7 @@
 #include <dirent.h>
 #include <stdlib.h>
 #include <limits.h>
+#include <errno.h>
 
 #include "prelude.h"
 #include "ksu.h"
@@ -70,9 +71,21 @@ static struct ksu_get_info_cmd g_version = {0};
 
 struct ksu_get_info_cmd get_info() {
 	if (!g_version.version) {
-		ksuctl(KSU_IOCTL_GET_INFO, &g_version);
+        if (ksuctl(KSU_IOCTL_GET_INFO, &g_version) < 0) {
+            ksuctl(KSU_IOCTL_GET_INFO_LEGACY, &g_version);
+            g_version.uapi_version = 0;
+        }
 	}
 	return g_version;
+}
+
+uint32_t get_kernel_uapi_version() {
+    struct ksu_get_info_cmd info = get_info();
+    return info.uapi_version;
+}
+
+uint32_t get_manager_uapi_version() {
+    return KERNEL_SU_UAPI_VERSION;
 }
 
 uint32_t get_version() {
@@ -128,6 +141,14 @@ bool is_late_load_mode() {
     auto info = get_info();
     if (info.version > 0) {
         return (info.flags & KSU_GET_INFO_FLAG_LATE_LOAD) != 0;
+    }
+    return false;
+}
+
+bool is_pr_build() {
+    auto info = get_info();
+    if (info.version > 0) {
+        return (info.flags & KSU_GET_INFO_FLAG_PR_BUILD) != 0;
     }
     return false;
 }
@@ -213,6 +234,25 @@ bool is_kernel_umount_enabled() {
     return value != 0;
 }
 
+int set_selinux_hide_enabled(bool enabled) {
+    if (!set_feature(KSU_FEATURE_SELINUX_HIDE, enabled ? 1 : 0)) {
+        return -errno;
+    }
+    return 0;
+}
+
+bool is_selinux_hide_enabled() {
+    uint64_t value = 0;
+    bool supported = false;
+    if (!get_feature(KSU_FEATURE_SELINUX_HIDE, &value, &supported)) {
+        return false;
+    }
+    if (!supported) {
+        return false;
+    }
+    return value != 0;
+}
+
 bool is_sulog_enabled() {
     uint64_t value = 0;
     bool supported = false;
@@ -239,13 +279,6 @@ void get_full_version(char* buff) {
 	}
 }
 
-bool is_KPM_enable(void) {
-    struct ksu_enable_kpm_cmd cmd = {};
-    if (ksuctl(KSU_IOCTL_ENABLE_KPM, &cmd) == 0 && cmd.enabled) {
-        return true;
-    }
-    return legacy_is_KPM_enable();
-}
 
 void get_hook_type(char *buff) {
     struct ksu_hook_type_cmd cmd = {0};
@@ -255,6 +288,13 @@ void get_hook_type(char *buff) {
     } else {
         legacy_get_hook_type(buff, 32);
     }
+}
+
+int get_kernel_patch_implement() {
+    struct ksu_get_kernel_patch_implement cmd = {0};
+    if (ksuctl(KSU_IOCTL_GET_KERNEL_PATCH_IMPLEMENT, &cmd) != 0)
+        return 0;
+    return cmd.type;
 }
 
 bool set_dynamic_manager(unsigned int size, const char *hash)

@@ -2,6 +2,7 @@
 #include "ksu.h"
 
 #include <jni.h>
+#include <errno.h>
 #include <sys/prctl.h>
 #include <android/log.h>
 #include <string.h>
@@ -11,6 +12,188 @@
 #include <unistd.h>
 #include <sys/wait.h>
 
+#define ALLOWLIST_FILE_MAGIC 0x7f4b5355
+#define ALLOWLIST_FILE_HEADER_SIZE 8
+#define ALLOWLIST_MIN_VERSION 2
+#define APP_PROFILE_SIZE_PRE_V4 776
+#define DEFAULT_SELINUX_DOMAIN "u:r:ksu:s0"
+
+enum allowlist_restore_result {
+    ALLOWLIST_RESTORE_SUCCESS = 0,
+    ALLOWLIST_RESTORE_INVALID_FILE = 1,
+    ALLOWLIST_RESTORE_UNSUPPORTED_VERSION = 2,
+    ALLOWLIST_RESTORE_IO_ERROR = 3,
+    ALLOWLIST_RESTORE_PROFILE_ERROR = 4,
+};
+
+enum exact_read_result {
+    EXACT_READ_ERROR = -2,
+    EXACT_READ_PARTIAL = -1,
+    EXACT_READ_EOF = 0,
+    EXACT_READ_COMPLETE = 1,
+};
+
+static uint32_t read_le32(const unsigned char *data) {
+    return (uint32_t) data[0] |
+           ((uint32_t) data[1] << 8) |
+           ((uint32_t) data[2] << 16) |
+           ((uint32_t) data[3] << 24);
+}
+
+static int read_exact(int fd, void *buffer, size_t length) {
+    size_t offset = 0;
+
+    while (offset < length) {
+        ssize_t count = read(fd, (char *) buffer + offset, length - offset);
+        if (count > 0) {
+            offset += (size_t) count;
+            continue;
+        }
+        if (count == 0) {
+            return offset == 0 ? EXACT_READ_EOF : EXACT_READ_PARTIAL;
+        }
+        if (errno != EINTR) {
+            return EXACT_READ_ERROR;
+        }
+    }
+
+    return EXACT_READ_COMPLETE;
+}
+
+static bool serialized_bool_valid(const bool *value) {
+    return *(const unsigned char *) value <= 1;
+}
+
+static void migrate_allowlist_profile(uint32_t version, struct app_profile *profile) {
+    if (version == 2 && profile->allow_su &&
+        strncmp(profile->rp_config.profile.selinux_domain, "u:r:su:s0",
+                sizeof(profile->rp_config.profile.selinux_domain)) == 0) {
+        memset(profile->rp_config.profile.selinux_domain, 0,
+               sizeof(profile->rp_config.profile.selinux_domain));
+        strncpy(profile->rp_config.profile.selinux_domain, DEFAULT_SELINUX_DOMAIN,
+                sizeof(profile->rp_config.profile.selinux_domain) - 1);
+    }
+
+    if (version < KSU_APP_PROFILE_VER && profile->allow_su) {
+        profile->rp_config.profile.flags = FLAG_KSU_NO_NEW_PRIVS;
+    }
+    profile->version = KSU_APP_PROFILE_VER;
+}
+
+static bool allowlist_profile_valid(const struct app_profile *profile) {
+    if (!serialized_bool_valid(&profile->allow_su) ||
+        memchr(profile->key, '\0', sizeof(profile->key)) == NULL) {
+        return false;
+    }
+
+    if (profile->allow_su) {
+        const struct root_profile *root = &profile->rp_config.profile;
+        return serialized_bool_valid(&profile->rp_config.use_default) &&
+               memchr(profile->rp_config.template_name, '\0',
+                      sizeof(profile->rp_config.template_name)) != NULL &&
+               root->groups_count <= KSU_MAX_GROUPS &&
+               root->selinux_domain[0] != '\0' &&
+               memchr(root->selinux_domain, '\0', sizeof(root->selinux_domain)) != NULL;
+    }
+
+    return serialized_bool_valid(&profile->nrp_config.use_default) &&
+           serialized_bool_valid(&profile->nrp_config.profile.umount_modules);
+}
+
+static bool append_allowlist_profile(struct app_profile **profiles, size_t *count,
+                                     size_t *capacity, const struct app_profile *profile) {
+    if (*count == UINT16_MAX) {
+        return false;
+    }
+
+    if (*count == *capacity) {
+        size_t new_capacity = *capacity == 0 ? 16 : *capacity * 2;
+        if (new_capacity > UINT16_MAX) {
+            new_capacity = UINT16_MAX;
+        }
+        struct app_profile *resized = realloc(*profiles, new_capacity * sizeof(**profiles));
+        if (!resized) {
+            return false;
+        }
+        *profiles = resized;
+        *capacity = new_capacity;
+    }
+
+    (*profiles)[(*count)++] = *profile;
+    return true;
+}
+
+NativeBridge(restoreAllowlistFromFd, jint, jint fd, jintArray failedUid) {
+    unsigned char header[ALLOWLIST_FILE_HEADER_SIZE];
+    struct app_profile *profiles = nullptr;
+    size_t profile_count = 0;
+    size_t profile_capacity = 0;
+    int result = ALLOWLIST_RESTORE_INVALID_FILE;
+
+    int read_result = read_exact(fd, header, sizeof(header));
+    if (read_result == EXACT_READ_ERROR) {
+        return ALLOWLIST_RESTORE_IO_ERROR;
+    }
+    if (read_result != EXACT_READ_COMPLETE ||
+        read_le32(header) != ALLOWLIST_FILE_MAGIC) {
+        return ALLOWLIST_RESTORE_INVALID_FILE;
+    }
+
+    uint32_t version = read_le32(header + sizeof(uint32_t));
+    if (version < ALLOWLIST_MIN_VERSION || version > KSU_APP_PROFILE_VER) {
+        return ALLOWLIST_RESTORE_UNSUPPORTED_VERSION;
+    }
+    size_t profile_size = version < KSU_APP_PROFILE_VER
+                          ? APP_PROFILE_SIZE_PRE_V4
+                          : sizeof(struct app_profile);
+
+    while (true) {
+        struct app_profile profile = {0};
+        read_result = read_exact(fd, &profile, profile_size);
+        if (read_result == EXACT_READ_EOF) {
+            break;
+        }
+        if (read_result == EXACT_READ_ERROR) {
+            result = ALLOWLIST_RESTORE_IO_ERROR;
+            goto out;
+        }
+        if (read_result != EXACT_READ_COMPLETE) {
+            goto out;
+        }
+
+        if (!serialized_bool_valid(&profile.allow_su)) {
+            goto out;
+        }
+        migrate_allowlist_profile(version, &profile);
+        if (!allowlist_profile_valid(&profile)) {
+            goto out;
+        }
+        errno = 0;
+        if (!append_allowlist_profile(&profiles, &profile_count, &profile_capacity, &profile)) {
+            result = errno == ENOMEM
+                     ? ALLOWLIST_RESTORE_IO_ERROR
+                     : ALLOWLIST_RESTORE_INVALID_FILE;
+            goto out;
+        }
+    }
+
+    for (size_t i = 0; i < profile_count; ++i) {
+        if (!set_app_profile(&profiles[i])) {
+            if (failedUid && GetEnvironment()->GetArrayLength(env, failedUid) > 0) {
+                jint uid = (jint) profiles[i].curr_uid;
+                GetEnvironment()->SetIntArrayRegion(env, failedUid, 0, 1, &uid);
+            }
+            result = ALLOWLIST_RESTORE_PROFILE_ERROR;
+            goto out;
+        }
+    }
+    result = ALLOWLIST_RESTORE_SUCCESS;
+
+    out:
+    free(profiles);
+    return result;
+}
+
 NativeBridgeNP(getVersion, jint) {
     uint32_t version = get_version();
     if (version > 0) {
@@ -18,6 +201,14 @@ NativeBridgeNP(getVersion, jint) {
     }
     // try legacy method as fallback
     return legacy_get_info().version;
+}
+
+NativeBridgeNP(getKernelUAPIVersion, jint) {
+    return get_kernel_uapi_version();
+}
+
+NativeBridgeNP(getManagerUAPIVersion, jint) {
+    return get_manager_uapi_version();
 }
 
 // get VERSION FULL
@@ -46,6 +237,10 @@ NativeBridgeNP(isLkmMode, jboolean) {
 
 NativeBridgeNP(isManager, jboolean) {
 	return is_manager();
+}
+
+NativeBridgeNP(isPrBuild, jboolean) {
+	return is_pr_build();
 }
 
 NativeBridgeNP(isLateLoadMode, jboolean) {
@@ -123,7 +318,7 @@ NativeBridge(getAppProfile, jobject, jstring pkg, jint uid) {
 	profile.version = KSU_APP_PROFILE_VER;
 
 	strcpy(profile.key, key);
-	profile.current_uid = uid;
+	profile.curr_uid = uid;
 
 	bool useDefaultProfile = get_app_profile(&profile) != 0;
 
@@ -143,17 +338,18 @@ NativeBridge(getAppProfile, jobject, jstring pkg, jint uid) {
 	jfieldID capabilitiesField = GetEnvironment()->GetFieldID(env, cls, "capabilities", "Ljava/util/List;");
 	jfieldID domainField = GetEnvironment()->GetFieldID(env, cls, "context", "Ljava/lang/String;");
 	jfieldID namespacesField = GetEnvironment()->GetFieldID(env, cls, "namespace", "I");
+	jfieldID flagsField = GetEnvironment()->GetFieldID(env, cls, "flags", "J");
 
 	jfieldID nonRootUseDefaultField = GetEnvironment()->GetFieldID(env, cls, "nonRootUseDefault", "Z");
 	jfieldID umountModulesField = GetEnvironment()->GetFieldID(env, cls, "umountModules", "Z");
 
 	GetEnvironment()->SetObjectField(env, obj, keyField, GetEnvironment()->NewStringUTF(env, profile.key));
-	GetEnvironment()->SetIntField(env, obj, currentUidField, profile.current_uid);
+	GetEnvironment()->SetIntField(env, obj, currentUidField, profile.curr_uid);
 
 	if (useDefaultProfile) {
 		// no profile found, so just use default profile:
 		// don't allow root and use default profile!
-        LOGD("use default profile for: %s, %d", key, uid);
+		LOGD("use default profile for: %s, %d", key, uid);
 
 		// allow_su = false
 		// non root use default = true
@@ -178,7 +374,7 @@ NativeBridge(getAppProfile, jobject, jstring pkg, jint uid) {
 		jobject groupList = GetEnvironment()->GetObjectField(env, obj, groupsField);
 		int groupCount = profile.rp_config.profile.groups_count;
 		if (groupCount > KSU_MAX_GROUPS) {
-            LOGD("kernel group count too large: %d???", groupCount);
+			LOGD("kernel group count too large: %d???", groupCount);
 			groupCount = KSU_MAX_GROUPS;
 		}
 		fillIntArray(env, groupList, profile.rp_config.profile.groups, groupCount);
@@ -194,6 +390,7 @@ NativeBridge(getAppProfile, jobject, jstring pkg, jint uid) {
 										 GetEnvironment()->NewStringUTF(env, profile.rp_config.profile.selinux_domain));
 		GetEnvironment()->SetIntField(env, obj, namespacesField, profile.rp_config.profile.namespaces);
 		GetEnvironment()->SetBooleanField(env, obj, allowSuField, profile.allow_su);
+		GetEnvironment()->SetLongField(env, obj, flagsField, (jlong) profile.rp_config.profile.flags);
 	} else {
 		GetEnvironment()->SetBooleanField(env, obj, nonRootUseDefaultField, profile.nrp_config.use_default);
 		GetEnvironment()->SetBooleanField(env, obj, umountModulesField, profile.nrp_config.profile.umount_modules);
@@ -218,6 +415,7 @@ NativeBridge(setAppProfile, jboolean, jobject profile) {
 	jfieldID capabilitiesField = GetEnvironment()->GetFieldID(env, cls, "capabilities", "Ljava/util/List;");
 	jfieldID domainField = GetEnvironment()->GetFieldID(env, cls, "context", "Ljava/lang/String;");
 	jfieldID namespacesField = GetEnvironment()->GetFieldID(env, cls, "namespace", "I");
+	jfieldID flagsField = GetEnvironment()->GetFieldID(env, cls, "flags", "J");
 
 	jfieldID nonRootUseDefaultField = GetEnvironment()->GetFieldID(env, cls, "nonRootUseDefault", "Z");
 	jfieldID umountModulesField = GetEnvironment()->GetFieldID(env, cls, "umountModules", "Z");
@@ -250,7 +448,7 @@ NativeBridge(setAppProfile, jboolean, jobject profile) {
 
 	strcpy(p.key, p_key);
 	p.allow_su = allowSu;
-	p.current_uid = currentUid;
+	p.curr_uid = currentUid;
 
 	if (allowSu) {
 		p.rp_config.use_default = GetEnvironment()->GetBooleanField(env, profile, rootUseDefaultField);
@@ -266,7 +464,7 @@ NativeBridge(setAppProfile, jboolean, jobject profile) {
 
 		int groups_count = getListSize(env, groups);
 		if (groups_count > KSU_MAX_GROUPS) {
-            LOGD("groups count too large: %d", groups_count);
+			LOGD("groups count too large: %d", groups_count);
 			return false;
 		}
 		p.rp_config.profile.groups_count = groups_count;
@@ -279,6 +477,7 @@ NativeBridge(setAppProfile, jboolean, jobject profile) {
 		GetEnvironment()->ReleaseStringUTFChars(env, (jstring) domain, cdomain);
 
 		p.rp_config.profile.namespaces = GetEnvironment()->GetIntField(env, profile, namespacesField);
+		p.rp_config.profile.flags = GetEnvironment()->GetLongField(env, profile, flagsField);
 	} else {
 		p.nrp_config.use_default = GetEnvironment()->GetBooleanField(env, profile, nonRootUseDefaultField);
 		p.nrp_config.profile.umount_modules = umountModules;
@@ -315,6 +514,14 @@ NativeBridge(setKernelUmountEnabled, jboolean, jboolean enabled) {
     return set_kernel_umount_enabled(enabled);
 }
 
+NativeBridgeNP(isSelinuxHideEnabled, jboolean) {
+    return is_selinux_hide_enabled();
+}
+
+NativeBridge(setSelinuxHideEnabled, jint, jboolean enabled) {
+    return set_selinux_hide_enabled(enabled);
+}
+
 NativeBridge(getUserName, jstring, jint uid) {
     struct passwd *pw = getpwuid((uid_t) uid);
     if (pw && pw->pw_name && pw->pw_name[0] != '\0') {
@@ -323,16 +530,43 @@ NativeBridge(getUserName, jstring, jint uid) {
     return NULL;
 }
 
-// Check if KPM is enabled
-NativeBridgeNP(isKPMEnabled, jboolean) {
-	return is_KPM_enable();
-}
-
 // Get HOOK type
 NativeBridgeNP(getHookType, jstring) {
     char hook_type[32] = { 0 };
 	get_hook_type((char *) &hook_type);
 	return GetEnvironment()->NewStringUTF(env, hook_type);
+}
+
+// Get KernelPatch implement
+NativeBridgeNP(getKernelPatchImplement, jobject) {
+	int type = get_kernel_patch_implement();
+
+	jclass cls = GetEnvironment()->FindClass(env,
+											 "com/resukisu/resukisu/Natives$KernelPatchImplement");
+	if (cls == nullptr) {
+		jclass exCls = GetEnvironment()->FindClass(env, "java/lang/IllegalStateException");
+		GetEnvironment()->ThrowNew(env, exCls, "Could not find KernelPatchImplement class");
+		return nullptr;
+	}
+
+	jmethodID valuesMethod = GetEnvironment()->GetStaticMethodID(env, cls, "values",
+																 "()[Lcom/resukisu/resukisu/Natives$KernelPatchImplement;");
+	if (valuesMethod == nullptr) {
+		jclass exCls = GetEnvironment()->FindClass(env, "java/lang/IllegalStateException");
+		GetEnvironment()->ThrowNew(env, exCls,
+								   "Could not find values() method in KernelPatchImplement");
+		return nullptr;
+	}
+
+	jobjectArray valuesArray = (jobjectArray) GetEnvironment()->CallStaticObjectMethod(env, cls,
+																					   valuesMethod);
+	if (valuesArray == nullptr) {
+		jclass exCls = GetEnvironment()->FindClass(env, "java/lang/IllegalStateException");
+		GetEnvironment()->ThrowNew(env, exCls, "Could get valuesArray in KernelPatchImplement");
+		return nullptr;
+	}
+
+	return GetEnvironment()->GetObjectArrayElement(env, valuesArray, (jsize) type);
 }
 
 // dynamic manager
